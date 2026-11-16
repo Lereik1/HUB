@@ -179,7 +179,7 @@ end
 -- KILL AURA: cuatro acciones
 local KillAuraEnabled = createOption(
     "KILL AURA",
-    "JumpKick + HandKick + JumpKick(2) + DoubleReg",
+    "Strength farm",
     65,
     {
         {remote = JumpKick},
@@ -192,7 +192,7 @@ local KillAuraEnabled = createOption(
 -- SPAM SWEEP: Stun
 local SpamSweepEnabled = createOption(
     "SPAM SWEEP",
-    "Función asignada: Stun",
+    "-",
     145,
     {
         {remote = Stun}
