@@ -18,7 +18,7 @@ local INTERVAL = 0
 
 
 
--- Interfaz principal
+-- interfaz sencilla para rapido ekisde
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LereikHub"
 ScreenGui.ResetOnSpawn = false
@@ -49,7 +49,7 @@ Title.TextSize = 21
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = Main
 
--- Botones superiores
+-- botonesss
 local function createButton(text,x,color)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0,30,0,30)
@@ -72,7 +72,7 @@ local Close = createButton("X", -8, Color3.fromRGB(170,55,75))
 local running = true
 local controllers = {}
 
--- Crear opciones
+-- las opciones ekisde
 local function createOption(name,note,y,remoteEvents)
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(0,165,0,25)
@@ -224,7 +224,7 @@ local AutoBenchEnabled = createOption(
     }
 )
 
--- Menú minimizado
+-- minimizadacionekisde
 local Mini = Instance.new("TextButton")
 Mini.Size = UDim2.new(0,110,0,38)
 Mini.Position = UDim2.new(0,15,0.5,0)
@@ -266,7 +266,6 @@ end
 
 _G.LereikHubCleanup = cleanup
 
--- Cerrar
 Close.MouseButton1Click:Connect(function()
     cleanup()
     ScreenGui:Destroy()
