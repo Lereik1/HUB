@@ -5,40 +5,43 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+
 local JumpKick = Remotes:WaitForChild("JumpKick")
 local HandKick = Remotes:WaitForChild("HandKick")
 local DoubleReg = Remotes:WaitForChild("DoubleReg")
 local Stun = Remotes:WaitForChild("Stun")
+local PushUp = Remotes:WaitForChild("PushUp")
+local Bench = Remotes:WaitForChild("Bench")
+
 
 local INTERVAL = 0
 
--- Detener una versión anterior
-if _G.LereikHubCleanup then
-    _G.LereikHubCleanup()
-end
+-- Detener versión anterior
 
 local oldGui = playerGui:FindFirstChild("LereikHub")
 if oldGui then
     oldGui:Destroy()
 end
 
+-- Interfaz principal
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LereikHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = playerGui
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0,270,0,245)
-Main.Position = UDim2.new(0.5,-135,0.5,-122)
+Main.Size = UDim2.new(0,270,0,325)
+Main.Position = UDim2.new(0.5,-135,0.5,-162)
 Main.BackgroundColor3 = Color3.fromRGB(18,18,25)
 Main.BorderSizePixel = 0
 Main.Parent = ScreenGui
 
 Instance.new("UICorner",Main).CornerRadius = UDim.new(0,12)
 
-local Stroke = Instance.new("UIStroke",Main)
+local Stroke = Instance.new("UIStroke")
 Stroke.Color = Color3.fromRGB(145,85,255)
 Stroke.Thickness = 1.5
+Stroke.Parent = Main
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1,-85,0,45)
@@ -51,6 +54,7 @@ Title.TextSize = 21
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = Main
 
+-- Botones superiores
 local function createButton(text,x,color)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0,30,0,30)
@@ -73,6 +77,7 @@ local Close = createButton("X", -8, Color3.fromRGB(170,55,75))
 local running = true
 local controllers = {}
 
+-- Crear opciones
 local function createOption(name,note,y,remoteEvents)
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(0,165,0,25)
@@ -145,16 +150,18 @@ local function createOption(name,note,y,remoteEvents)
                 and ScreenGui.Parent do
 
                 for _, action in ipairs(remoteEvents) do
-                    if not running
-                        or not Active
-                        or generation ~= currentGeneration then
-                        break
-                    end
+                        for i = 1, 2 do
+                            if not running
+                                or not Active
+                                or generation ~= currentGeneration then
+                                break
+                            end
 
-                    action.remote:FireServer(
-                        table.unpack(action.args or {})
-                    )
-                end
+                            action.remote:FireServer(
+                                table.unpack(action.args or {})
+                            )
+                        end
+                    end
 
                 task.wait(INTERVAL)
             end
@@ -176,7 +183,7 @@ local function createOption(name,note,y,remoteEvents)
     end
 end
 
--- KILL AURA: cuatro acciones
+-- KILL AURA
 local KillAuraEnabled = createOption(
     "KILL AURA",
     "Strength farm",
@@ -189,13 +196,30 @@ local KillAuraEnabled = createOption(
     }
 )
 
--- SPAM SWEEP: Stun
+-- SPAM SWEEP
 local SpamSweepEnabled = createOption(
     "SPAM SWEEP",
-    "-",
+    "test version",
     145,
     {
         {remote = Stun}
+    }
+)
+
+-- AUTO BENCH
+local AutoBenchEnabled = createOption(
+    "AUTO BENCH",
+    "health farm",
+    225,
+    {
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = Bench},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = Bench},
+
     }
 )
 
@@ -214,16 +238,19 @@ Mini.Parent = ScreenGui
 
 Instance.new("UICorner",Mini).CornerRadius = UDim.new(0,8)
 
+-- Minimizar
 Hide.MouseButton1Click:Connect(function()
     Main.Visible = false
     Mini.Visible = true
 end)
 
+-- Restaurar
 Mini.MouseButton1Click:Connect(function()
     Main.Visible = true
     Mini.Visible = false
 end)
 
+-- Detener todos los bucles
 local function cleanup()
     if not running then
         return
@@ -238,6 +265,7 @@ end
 
 _G.LereikHubCleanup = cleanup
 
+-- Cerrar
 Close.MouseButton1Click:Connect(function()
     cleanup()
     ScreenGui:Destroy()
