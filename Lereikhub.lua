@@ -1,3 +1,4 @@
+-- no lo voy a ofuscar porque me da flojera xdxdxdxdxd
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
