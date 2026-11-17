@@ -223,6 +223,8 @@ local AutoBenchEnabled = createOption(
         {remote = Bench},
         {remote = Bench},
         {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench}
 
     }
 )
