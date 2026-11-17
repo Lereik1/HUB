@@ -16,12 +16,7 @@ local Bench = Remotes:WaitForChild("Bench")
 
 local INTERVAL = 0
 
--- Detener versión anterior
 
-local oldGui = playerGui:FindFirstChild("LereikHub")
-if oldGui then
-    oldGui:Destroy()
-end
 
 -- Interfaz principal
 local ScreenGui = Instance.new("ScreenGui")
