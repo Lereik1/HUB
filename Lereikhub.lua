@@ -102,17 +102,6 @@ end
 local Hide = createHeaderButton("-", -72, OFF)
 local Close = createHeaderButton("X", -37, Color3.fromRGB(145, 42, 65))
 
--- sub
-local SubTitle = Instance.new("TextLabel")
-SubTitle.Size = UDim2.new(1, -26, 0, 22)
-SubTitle.Position = UDim2.new(0, 13, 0, 55)
-SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "AUTOMATION  /  04 MODULES"
-SubTitle.TextColor3 = MUTED
-SubTitle.Font = Enum.Font.Code
-SubTitle.TextSize = 11
-SubTitle.TextXAlignment = Enum.TextXAlignment.Left
-SubTitle.Parent = Main
 
 local running = true
 local controllers = {}
@@ -285,9 +274,6 @@ local AutoBenchEnabled = createOption(
         {remote = PushUp},
         {remote = Bench},
         {remote = Bench},
-        {remote = Bench},
-        {remote = Bench},
-        {remote = Bench},
         {remote = Bench}
     }
 )
@@ -311,7 +297,7 @@ Mini.Position = UDim2.new(0, 15, 0.5, 0)
 Mini.AnchorPoint = Vector2.new(0, 0.5)
 Mini.BackgroundColor3 = BG
 Mini.BorderSizePixel = 0
-Mini.Text = "LEREIK HUB  [+]"
+Mini.Text = "LereiK HUB +"
 Mini.TextColor3 = PURPLE
 Mini.Font = Enum.Font.GothamBold
 Mini.TextSize = 12
@@ -320,7 +306,6 @@ Mini.Parent = ScreenGui
 
 local MiniStroke = Instance.new("UIStroke")
 MiniStroke.Color = PURPLE
-MiniStroke.Thickness = 1
 MiniStroke.Parent = Mini
 
 -- Minimizarekisde
