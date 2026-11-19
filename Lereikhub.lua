@@ -18,10 +18,6 @@ local Dumbell = Remotes:WaitForChild("Dumbell")
 
 local INTERVAL = 0
 
-local oldGui = playerGui:FindFirstChild("LereikHub")
-if oldGui then
-    oldGui:Destroy()
-end
 
 -- colors pa que se vea bien
 local BG = Color3.fromRGB(13, 13, 18)
