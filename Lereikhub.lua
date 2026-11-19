@@ -292,21 +292,47 @@ local AutoDumbellEnabled = createOption(
 -- boton chido
 local Mini = Instance.new("TextButton")
 Mini.Name = "Mini"
-Mini.Size = UDim2.new(0, 135, 0, 39)
+Mini.Size = UDim2.new(0, 160, 0, 42)
 Mini.Position = UDim2.new(0, 15, 0.5, 0)
-Mini.AnchorPoint = Vector2.new(0, 0.1)
+Mini.AnchorPoint = Vector2.new(0, 0.5)
 Mini.BackgroundColor3 = BG
 Mini.BorderSizePixel = 0
-Mini.Text = "LereiK HUB +"
-Mini.TextColor3 = PURPLE
-Mini.Font = Enum.Font.GothamBold
-Mini.TextSize = 12
+Mini.Text = ""
+Mini.AutoButtonColor = true
 Mini.Visible = false
 Mini.Parent = ScreenGui
 
 local MiniStroke = Instance.new("UIStroke")
 MiniStroke.Color = PURPLE
+MiniStroke.Thickness = 1
 MiniStroke.Parent = Mini
+
+local Accent = Instance.new("Frame")
+Accent.Size = UDim2.new(0, 3, 1, 0)
+Accent.BackgroundColor3 = PURPLE
+Accent.BorderSizePixel = 0
+Accent.Parent = Mini
+
+local MiniTitle = Instance.new("TextLabel")
+MiniTitle.Size = UDim2.new(1, -45, 1, 0)
+MiniTitle.Position = UDim2.new(0, 13, 0, 0)
+MiniTitle.BackgroundTransparency = 1
+MiniTitle.Text = "LereiK HUB"
+MiniTitle.TextColor3 = Color3.fromRGB(225, 215, 245)
+MiniTitle.Font = Enum.Font.GothamMedium
+MiniTitle.TextSize = 13
+MiniTitle.TextXAlignment = Enum.TextXAlignment.Left
+MiniTitle.Parent = Mini
+
+local MiniPlus = Instance.new("TextLabel")
+MiniPlus.Size = UDim2.new(0, 30, 1, 0)
+MiniPlus.Position = UDim2.new(1, -34, 0, 0)
+MiniPlus.BackgroundTransparency = 1
+MiniPlus.Text = "+"
+MiniPlus.TextColor3 = PURPLE
+MiniPlus.Font = Enum.Font.Gotham
+MiniPlus.TextSize = 23
+MiniPlus.Parent = Mini
 
 -- Minimizarekisde
 Hide.MouseButton1Click:Connect(function()
