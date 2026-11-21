@@ -294,20 +294,24 @@ local AutoBenchEnabled = createOption(
     {
         {remote = PushUp},
         {remote = Bench},
-        {remote = PushUp},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
-        {remote = PushUp},
+        {remote = Bench},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
-        {remote = PushUp},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
+        {remote = Bench},
+        {remote = Bench},
         {remote = PushUp},
-        {remote = Bench}
+        {remote = Bench},
+        {remote = Bench},
+        {remote = Bench},
+        {remote = Bench},
+        
     }
 )
 addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
@@ -340,7 +344,7 @@ addToSection("PVP", "KILL AURA", "PVP_KillAura")
 local SpamSweepEnabled = createOption(
     "SPAM SWEEP", "Test version", 173,
     {{remote = Stun, repetitions = 1}},
-    0.7
+    0.6
 )
 addToSection("PVP", "SPAM SWEEP", "PVP_SpamSweep")
 
