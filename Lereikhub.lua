@@ -16,6 +16,39 @@ local PushUp = Remotes:WaitForChild("PushUp")
 local Bench = Remotes:WaitForChild("Bench")
 local Dumbell = Remotes:WaitForChild("Dumbell")
 
+-- Persistencia local del menu (requiere readfile/writefile del ejecutor).
+local HttpService = game:GetService("HttpService")
+local SAVE_FILE = "LereikHub_Config_" .. tostring(player.UserId) .. ".json"
+local saved = { toggles = {}, hitboxes = {}, hitboxDefaultSize = "10", lastTab = "Farming" }
+local persistenceAvailable = type(readfile) == "function" and type(writefile) == "function"
+local function loadSettings()
+    if not persistenceAvailable then return end
+    local ok, result = pcall(function()
+        if type(isfile) == "function" and not isfile(SAVE_FILE) then return nil end
+        return HttpService:JSONDecode(readfile(SAVE_FILE))
+    end)
+    if ok and type(result) == "table" then
+        if type(result.toggles) == "table" then saved.toggles = result.toggles end
+        if type(result.hitboxes) == "table" then saved.hitboxes = result.hitboxes end
+        if type(result.hitboxDefaultSize) == "string" then saved.hitboxDefaultSize = result.hitboxDefaultSize end
+        if result.lastTab == "Farming" or result.lastTab == "PVP" or result.lastTab == "Utilities" then
+            saved.lastTab = result.lastTab
+        end
+    end
+end
+loadSettings()
+local function saveSettings()
+    if not persistenceAvailable then return end
+    local ok, err = pcall(function()
+        writefile(SAVE_FILE, HttpService:JSONEncode(saved))
+    end)
+    if not ok then warn("LereikHub: no se pudieron guardar ajustes: " .. tostring(err)) end
+end
+local function saveToggle(key, active)
+    saved.toggles[key] = active == true
+    saveSettings()
+end
+
 local INTERVAL = 0
 
 
@@ -103,7 +136,7 @@ local running = true
 local controllers = {}
 
 -- opciones ekisde
-local function createOption(name, note, y, remoteEvents, interval)
+local function createOption(name, note, y, remoteEvents, interval, saveKey)
     interval = interval or INTERVAL
 
     local Option = Instance.new("Frame")
@@ -213,12 +246,12 @@ local function createOption(name, note, y, remoteEvents, interval)
     end
 
     Toggle.MouseButton1Click:Connect(function()
-        if Active then
-            stop()
-        else
-            start()
-        end
+        if Active then stop() else start() end
+        if saveKey then saveToggle(saveKey, Active) end
     end)
+    if saveKey and saved.toggles[saveKey] == true then
+        task.defer(start)
+    end
 
     table.insert(controllers, stop)
 
@@ -277,6 +310,8 @@ PVPScroll.Parent = Main
 
 local function showSection(section)
     currentSection = section
+    saved.lastTab = section
+    saveSettings()
     PVPScroll.Visible = (section == "PVP")
     for name, items in pairs(sections) do
         for _, option in ipairs(items) do
@@ -299,7 +334,7 @@ end
 -- FARMING: AUTO DUMBELL
 local AutoDumbellEnabled = createOption(
     "AUTO DUMBELL", "farm strength", 101,
-    {{remote = Dumbell, args = {"Rep", 1}}}, 0
+    {{remote = Dumbell, args = {"Rep", 1}}}, 0, "Farming_AutoDumbell"
 )
 addToSection("Farming", "AUTO DUMBELL", "Farming_AutoDumbell")
 
@@ -325,7 +360,7 @@ local AutoBenchEnabled = createOption(
         {remote = Bench},
         {remote = Bench},
         {remote = Bench}
-    }
+    }, nil, "Farming_AutoBench"
 )
 addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
 
@@ -337,7 +372,7 @@ local KillAuraEnabled = createOption(
         {remote = HandKick},
         {remote = JumpKick, args = {2}},
         {remote = DoubleReg}
-    }
+    }, nil, "Farming_KillAura"
 )
 addToSection("Farming", "KILL AURA", "Farming_KillAura")
 
@@ -349,7 +384,7 @@ local PvpKillAuraEnabled = createOption(
         {remote = HandKick},
         {remote = JumpKick, args = {2}},
         {remote = DoubleReg}
-    }
+    }, nil, "PVP_KillAura"
 )
 addToSection("PVP", "KILL AURA", "PVP_KillAura")
 
@@ -357,7 +392,7 @@ addToSection("PVP", "KILL AURA", "PVP_KillAura")
 local SpamSweepEnabled = createOption(
     "SPAM SWEEP", "Test version", 173,
     {{remote = Stun, repetitions = 1}},
-    0.5
+    0.5, "PVP_SpamSweep"
 )
 addToSection("PVP", "SPAM SWEEP", "PVP_SpamSweep")
 
@@ -524,10 +559,11 @@ local function stopAntiFling()
     end
 end
 
-FlingToggle.MouseButton1Click:Connect(function()
+local function toggleAntiFling()
     if not running then return end
     if flingActive then
         stopAntiFling()
+        saveToggle("PVP_AntiFling", false)
         return
     end
 
@@ -580,7 +616,10 @@ FlingToggle.MouseButton1Click:Connect(function()
     FlingToggle.Text = "ON"
     FlingToggle.BackgroundColor3 = PURPLE
     FlingIndicator.BackgroundColor3 = PURPLE
-end)
+    saveToggle("PVP_AntiFling", true)
+end
+FlingToggle.MouseButton1Click:Connect(toggleAntiFling)
+if saved.toggles.PVP_AntiFling == true then task.defer(toggleAntiFling) end
 
 table.insert(controllers, stopAntiFling)
 
@@ -648,10 +687,11 @@ local function stopBlock()
     end
 end
 
-BlockToggle.MouseButton1Click:Connect(function()
+local function toggleBlock()
     if not running then return end
     if blockActive then
         stopBlock()
+        saveToggle("PVP_Block", false)
         return
     end
 
@@ -661,6 +701,7 @@ BlockToggle.MouseButton1Click:Connect(function()
     BlockToggle.Text = "ON"
     BlockToggle.BackgroundColor3 = PURPLE
     BlockIndicator.BackgroundColor3 = PURPLE
+    saveToggle("PVP_Block", true)
 
     task.spawn(function()
         while running and blockActive and blockGeneration == thisGeneration and ScreenGui.Parent do
@@ -671,7 +712,9 @@ BlockToggle.MouseButton1Click:Connect(function()
             BlockEvent:FireServer("Begin")
         end
     end)
-end)
+end
+BlockToggle.MouseButton1Click:Connect(toggleBlock)
+if saved.toggles.PVP_Block == true then task.defer(toggleBlock) end
 
 table.insert(controllers, stopBlock)
 
@@ -759,21 +802,32 @@ HitboxStatus.Parent = HitboxOption
 local hitboxEntries = {}
 local hitboxOrder = {}
 local HITBOX_ROW_HEIGHT = 52
+HitboxSize.Text = saved.hitboxDefaultSize
+
+local function persistHitboxes()
+    saved.hitboxes = {}
+    for _, entry in ipairs(hitboxOrder) do
+        table.insert(saved.hitboxes, {
+            userId = entry.userId,
+            username = entry.username,
+            size = entry.size,
+            active = entry.active,
+        })
+    end
+    saved.hitboxDefaultSize = HitboxSize.Text
+    saveSettings()
+end
 
 local function findHitboxPlayer(query)
     query = query:lower():gsub("^%s+", ""):gsub("%s+$", "")
     if query == "" then return nil end
     for _, other in ipairs(Players:GetPlayers()) do
-        if other ~= player and other.Name:lower() == query then
-            return other
-        end
+        if other ~= player and other.Name:lower() == query then return other end
     end
     local match
     for _, other in ipairs(Players:GetPlayers()) do
-        if other ~= player and (
-            other.Name:lower():sub(1, #query) == query
-            or other.DisplayName:lower():sub(1, #query) == query
-        ) then
+        if other ~= player and (other.Name:lower():sub(1, #query) == query
+                or other.DisplayName:lower():sub(1, #query) == query) then
             if match then return nil end
             match = other
         end
@@ -804,84 +858,91 @@ local function restoreEntry(entry)
     entry.originalCanCollide = nil
 end
 
-local function stopEntry(entry)
-    entry.active = false
+local function renderEntry(entry)
+    if not entry.toggle.Parent then return end
+    entry.toggle.Text = entry.active and "ON" or "OFF"
+    entry.toggle.BackgroundColor3 = entry.active and PURPLE or OFF
+    entry.indicator.BackgroundColor3 = entry.active and PURPLE or OFF
+    entry.nameLabel.Text = entry.username .. (entry.target and "" or " [fuera]")
+end
+
+local function detachEntry(entry)
     entry.generation += 1
     if entry.respawnConnection then
         entry.respawnConnection:Disconnect()
         entry.respawnConnection = nil
     end
     restoreEntry(entry)
-    if entry.toggle.Parent then
-        entry.toggle.Text = "OFF"
-        entry.toggle.BackgroundColor3 = OFF
-        entry.indicator.BackgroundColor3 = OFF
-    end
+    entry.target = nil
+    renderEntry(entry)
 end
 
 local function applyEntry(entry, character, generation)
     local root = character:WaitForChild("HumanoidRootPart", 8)
-    if not running or not entry.active or entry.generation ~= generation
-        or entry.target.Character ~= character or not root then return end
+    if not root or not running or not entry.active or entry.generation ~= generation
+        or not entry.target or entry.target.Character ~= character then return end
     restoreEntry(entry)
     entry.root = root
     entry.originalSize = root.Size
     entry.originalTransparency = root.Transparency
     entry.originalCanCollide = root.CanCollide
-    local size = entry.size
-    root.Size = Vector3.new(size, size, size)
+    root.Size = Vector3.new(entry.size, entry.size, entry.size)
     root.Transparency = 0.65
     root.CanCollide = false
 end
 
+local function bindEntry(entry, target)
+    detachEntry(entry)
+    entry.target = target
+    entry.username = target.Name
+    if entry.active then
+        local generation = entry.generation
+        entry.respawnConnection = target.CharacterAdded:Connect(function(character)
+            task.spawn(applyEntry, entry, character, generation)
+        end)
+        if target.Character then
+            task.spawn(applyEntry, entry, target.Character, generation)
+        end
+    end
+    renderEntry(entry)
+end
+
+local function stopEntry(entry)
+    entry.active = false
+    detachEntry(entry)
+    local current = Players:GetPlayerByUserId(entry.userId)
+    if current then entry.target = current end
+    renderEntry(entry)
+end
+
 local function startEntry(entry)
     if not running or entry.active then return end
-    if entry.target.Parent ~= Players then
-        HitboxStatus.Text = "Ese jugador ya no esta en el servidor"
-        return
-    end
     entry.active = true
-    entry.generation += 1
-    local generation = entry.generation
-    entry.toggle.Text = "ON"
-    entry.toggle.BackgroundColor3 = PURPLE
-    entry.indicator.BackgroundColor3 = PURPLE
-    entry.respawnConnection = entry.target.CharacterAdded:Connect(function(character)
-        task.spawn(applyEntry, entry, character, generation)
-    end)
-    if entry.target.Character then
-        task.spawn(applyEntry, entry, entry.target.Character, generation)
+    local target = Players:GetPlayerByUserId(entry.userId)
+    if target and target ~= player then
+        bindEntry(entry, target)
+    else
+        renderEntry(entry)
+        HitboxStatus.Text = entry.username .. " guardado; se activara al entrar"
     end
 end
 
 local function removeEntry(entry)
     stopEntry(entry)
-    hitboxEntries[entry.target.UserId] = nil
+    hitboxEntries[entry.userId] = nil
     for i, item in ipairs(hitboxOrder) do
-        if item == entry then
-            table.remove(hitboxOrder, i)
-            break
-        end
+        if item == entry then table.remove(hitboxOrder, i) break end
     end
     entry.frame:Destroy()
     updateHitboxLayout()
+    persistHitboxes()
 end
 
-local function addHitboxPlayer()
-    local target = findHitboxPlayer(HitboxName.Text)
-    local size = tonumber(HitboxSize.Text)
-    if not target then
-        HitboxStatus.Text = "Jugador no encontrado o ambiguo"
-        return
-    end
-    if not size or size < 2 or size > 999 then
-        HitboxStatus.Text = "Tamano invalido: usa 2 a 999"
-        return
-    end
-    if hitboxEntries[target.UserId] then
-        HitboxStatus.Text = "Ya agregado: " .. target.Name
-        return
-    end
+local function createHitboxEntry(userId, username, size, enabled)
+    userId = tonumber(userId)
+    size = tonumber(size)
+    if not userId or userId == player.UserId or not size or size < 2 or size > 999
+        or hitboxEntries[userId] then return end
 
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, -24, 0, 45)
@@ -899,7 +960,7 @@ local function addHitboxPlayer()
     name.Size = UDim2.new(0, 104, 0, 18)
     name.Position = UDim2.new(0, 9, 0, 4)
     name.BackgroundTransparency = 1
-    name.Text = target.Name
+    name.Text = username
     name.TextTruncate = Enum.TextTruncate.AtEnd
     name.TextColor3 = TEXT
     name.Font = Enum.Font.GothamMedium
@@ -907,10 +968,8 @@ local function addHitboxPlayer()
     name.TextXAlignment = Enum.TextXAlignment.Left
     name.Parent = frame
 
-    local sizeField = makeHitboxField(
-        frame, "Tamano", UDim2.new(0, 67, 0, 21),
-        UDim2.new(0, 9, 0, 22), tostring(size)
-    )
+    local sizeField = makeHitboxField(frame, "Tamano", UDim2.new(0, 67, 0, 21),
+        UDim2.new(0, 9, 0, 22), tostring(size))
     sizeField.TextSize = 11
 
     local toggle = Instance.new("TextButton")
@@ -935,20 +994,17 @@ local function addHitboxPlayer()
     remove.TextSize = 11
     remove.Parent = frame
 
-    local entry = {
-        target = target, size = size, frame = frame,
-        indicator = indicator, toggle = toggle,
-        active = false, generation = 0
-    }
-    hitboxEntries[target.UserId] = entry
+    local entry = { userId = userId, username = tostring(username), size = size,
+        frame = frame, indicator = indicator, toggle = toggle, nameLabel = name,
+        active = false, generation = 0 }
+    hitboxEntries[userId] = entry
     table.insert(hitboxOrder, entry)
 
     toggle.MouseButton1Click:Connect(function()
         if entry.active then stopEntry(entry) else startEntry(entry) end
+        persistHitboxes()
     end)
-    remove.MouseButton1Click:Connect(function()
-        removeEntry(entry)
-    end)
+    remove.MouseButton1Click:Connect(function() removeEntry(entry) end)
     sizeField.FocusLost:Connect(function()
         local nextSize = tonumber(sizeField.Text)
         if not nextSize or nextSize < 2 or nextSize > 999 then
@@ -958,31 +1014,73 @@ local function addHitboxPlayer()
         end
         if nextSize ~= entry.size then
             local wasActive = entry.active
-            if wasActive then stopEntry(entry) end
+            stopEntry(entry)
             entry.size = nextSize
             if wasActive then startEntry(entry) end
+            persistHitboxes()
         end
     end)
-
     updateHitboxLayout()
-    startEntry(entry)
+    if enabled then startEntry(entry) else
+        local target = Players:GetPlayerByUserId(userId)
+        if target then entry.target = target end
+        renderEntry(entry)
+    end
+    return entry
+end
+
+local function addHitboxPlayer()
+    local target = findHitboxPlayer(HitboxName.Text)
+    local size = tonumber(HitboxSize.Text)
+    if not target then
+        HitboxStatus.Text = "Jugador no encontrado o ambiguo"
+        return
+    end
+    if not size or size < 2 or size > 999 then
+        HitboxStatus.Text = "Tamano invalido: usa 2 a 999"
+        return
+    end
+    if hitboxEntries[target.UserId] then
+        HitboxStatus.Text = "Ya agregado: " .. target.Name
+        return
+    end
+    createHitboxEntry(target.UserId, target.Name, size, true)
     HitboxName.Text = ""
     HitboxStatus.Text = "Agregado: " .. target.Name .. " | " .. tostring(size)
+    persistHitboxes()
 end
 
 AddHitbox.MouseButton1Click:Connect(addHitboxPlayer)
+HitboxSize.FocusLost:Connect(function() persistHitboxes() end)
 
+-- Cargar todos los usuarios guardados, aunque no esten conectados.
+for _, data in ipairs(saved.hitboxes) do
+    if type(data) == "table" then
+        createHitboxEntry(data.userId, data.username or ("User " .. tostring(data.userId)),
+            data.size, data.active == true)
+    end
+end
+if #hitboxOrder > 0 then
+    HitboxStatus.Text = tostring(#hitboxOrder) .. " jugadores recuperados"
+elseif not persistenceAvailable then
+    HitboxStatus.Text = "Sin readfile/writefile: no se guardara al salir"
+end
+
+local playerAddedHitboxConnection = Players.PlayerAdded:Connect(function(joined)
+    local entry = hitboxEntries[joined.UserId]
+    if entry then bindEntry(entry, joined) end
+end)
 local playerRemovingConnection = Players.PlayerRemoving:Connect(function(leaving)
     local entry = hitboxEntries[leaving.UserId]
-    if entry then removeEntry(entry) end
+    if entry then detachEntry(entry) end
 end)
 
 local function stopAllHitboxes()
+    playerAddedHitboxConnection:Disconnect()
     playerRemovingConnection:Disconnect()
-    for _, entry in ipairs(hitboxOrder) do
-        stopEntry(entry)
-    end
+    for _, entry in ipairs(hitboxOrder) do stopEntry(entry) end
 end
+
 table.insert(controllers, stopAllHitboxes)
 updateHitboxLayout()
 
@@ -1059,10 +1157,11 @@ local function stopAntiAFK()
     end
 end
 
-AFKToggle.MouseButton1Click:Connect(function()
+local function toggleAntiAFK()
     if not running then return end
     if afkActive then
         stopAntiAFK()
+        saveToggle("Utilities_AntiAFK", false)
         return
     end
     local ok, connection = pcall(function()
@@ -1082,13 +1181,16 @@ AFKToggle.MouseButton1Click:Connect(function()
         AFKToggle.Text = "ON"
         AFKToggle.BackgroundColor3 = PURPLE
         AFKIndicator.BackgroundColor3 = PURPLE
+        saveToggle("Utilities_AntiAFK", true)
     else
         warn("No se pudo activar ANTI AFK")
     end
-end)
+end
+AFKToggle.MouseButton1Click:Connect(toggleAntiAFK)
+if saved.toggles.Utilities_AntiAFK == true then task.defer(toggleAntiAFK) end
 
 table.insert(controllers, stopAntiAFK)
-showSection("Farming")
+showSection(saved.lastTab)
 
 -- boton chido
 local Mini = Instance.new("TextButton")
