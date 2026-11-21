@@ -343,6 +343,121 @@ local SpamSweepEnabled = createOption(
 )
 addToSection("PVP", "SPAM SWEEP", "PVP_SpamSweep")
 
+-- PVP: ANTI FLING
+-- Conserva los limites y la logica del Anti-Fling proporcionado.
+local RunService = game:GetService("RunService")
+local MAX_SPEED = 180
+local MAX_SPIN = 100
+local SafePos
+
+local FlingOption = Instance.new("Frame")
+FlingOption.Name = "PVP_AntiFling"
+FlingOption.Size = UDim2.new(1, -26, 0, 62)
+FlingOption.Position = UDim2.new(0, 13, 0, 245)
+FlingOption.BackgroundColor3 = PANEL
+FlingOption.BorderSizePixel = 0
+FlingOption.Parent = Main
+table.insert(sections.PVP, FlingOption)
+
+local FlingIndicator = Instance.new("Frame")
+FlingIndicator.Size = UDim2.new(0, 3, 1, 0)
+FlingIndicator.BackgroundColor3 = OFF
+FlingIndicator.BorderSizePixel = 0
+FlingIndicator.Parent = FlingOption
+
+local FlingLabel = Instance.new("TextLabel")
+FlingLabel.Size = UDim2.new(0, 170, 0, 24)
+FlingLabel.Position = UDim2.new(0, 12, 0, 9)
+FlingLabel.BackgroundTransparency = 1
+FlingLabel.Text = "ANTI FLING"
+FlingLabel.TextColor3 = TEXT
+FlingLabel.Font = Enum.Font.GothamBold
+FlingLabel.TextSize = 13
+FlingLabel.TextXAlignment = Enum.TextXAlignment.Left
+FlingLabel.Parent = FlingOption
+
+local FlingNote = Instance.new("TextLabel")
+FlingNote.Size = UDim2.new(0, 175, 0, 18)
+FlingNote.Position = UDim2.new(0, 12, 0, 32)
+FlingNote.BackgroundTransparency = 1
+FlingNote.Text = "Fling protection"
+FlingNote.TextColor3 = MUTED
+FlingNote.Font = Enum.Font.Code
+FlingNote.TextSize = 11
+FlingNote.TextXAlignment = Enum.TextXAlignment.Left
+FlingNote.Parent = FlingOption
+
+local FlingToggle = Instance.new("TextButton")
+FlingToggle.Size = UDim2.new(0, 56, 0, 29)
+FlingToggle.Position = UDim2.new(1, -68, 0, 16)
+FlingToggle.BackgroundColor3 = OFF
+FlingToggle.BorderSizePixel = 0
+FlingToggle.Text = "OFF"
+FlingToggle.TextColor3 = TEXT
+FlingToggle.Font = Enum.Font.GothamBold
+FlingToggle.TextSize = 12
+FlingToggle.Parent = FlingOption
+
+local flingActive = false
+local flingHeartbeatConnection
+local flingCharacterConnection
+
+local function stopAntiFling()
+    flingActive = false
+    if flingHeartbeatConnection then
+        flingHeartbeatConnection:Disconnect()
+        flingHeartbeatConnection = nil
+    end
+    if flingCharacterConnection then
+        flingCharacterConnection:Disconnect()
+        flingCharacterConnection = nil
+    end
+    SafePos = nil
+    if FlingToggle.Parent then
+        FlingToggle.Text = "OFF"
+        FlingToggle.BackgroundColor3 = OFF
+        FlingIndicator.BackgroundColor3 = OFF
+    end
+end
+
+FlingToggle.MouseButton1Click:Connect(function()
+    if not running then return end
+    if flingActive then
+        stopAntiFling()
+        return
+    end
+
+    flingActive = true
+    SafePos = nil
+    flingCharacterConnection = player.CharacterAdded:Connect(function()
+        SafePos = nil
+    end)
+
+    flingHeartbeatConnection = RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not root or not hum or hum.Health <= 0 then return end
+
+        local speed = root.AssemblyLinearVelocity.Magnitude
+        local spin = root.AssemblyAngularVelocity.Magnitude
+
+        if speed > MAX_SPEED or spin > MAX_SPIN then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+            if SafePos then char:PivotTo(SafePos) end
+        elseif speed < 45 and spin < 25 then
+            SafePos = root.CFrame
+        end
+    end)
+
+    FlingToggle.Text = "ON"
+    FlingToggle.BackgroundColor3 = PURPLE
+    FlingIndicator.BackgroundColor3 = PURPLE
+end)
+
+table.insert(controllers, stopAntiFling)
+
 -- UTILITIES: ANTI AFK (nuevo; no modifica createOption)
 local AFKOption = Instance.new("Frame")
 AFKOption.Name = "Utilities_AntiAFK"
@@ -443,7 +558,7 @@ showSection("Farming")
 -- boton chido
 local Mini = Instance.new("TextButton")
 Mini.Name = "Mini"
-Mini.Size = UDim2.new(0, 160, 0, 42)
+Mini.Size = UDim2.new(0, 142, 0, 36)
 Mini.Position = UDim2.new(0, 15, 0.5, 0)
 Mini.AnchorPoint = Vector2.new(0, 0.5)
 Mini.BackgroundColor3 = BG
@@ -465,13 +580,13 @@ Accent.BorderSizePixel = 0
 Accent.Parent = Mini
 
 local MiniTitle = Instance.new("TextLabel")
-MiniTitle.Size = UDim2.new(1, -45, 1, 0)
+MiniTitle.Size = UDim2.new(1, -40, 1, 0)
 MiniTitle.Position = UDim2.new(0, 13, 0, 0)
 MiniTitle.BackgroundTransparency = 1
 MiniTitle.Text = "LereiK HUB"
 MiniTitle.TextColor3 = Color3.fromRGB(225, 215, 245)
 MiniTitle.Font = Enum.Font.GothamMedium
-MiniTitle.TextSize = 13
+MiniTitle.TextSize = 12
 MiniTitle.TextXAlignment = Enum.TextXAlignment.Left
 MiniTitle.Parent = Mini
 
@@ -482,7 +597,7 @@ MiniPlus.BackgroundTransparency = 1
 MiniPlus.Text = "+"
 MiniPlus.TextColor3 = PURPLE
 MiniPlus.Font = Enum.Font.Gotham
-MiniPlus.TextSize = 23
+MiniPlus.TextSize = 20
 MiniPlus.Parent = Mini
 
 -- Minimizarekisde
@@ -491,8 +606,65 @@ Hide.MouseButton1Click:Connect(function()
     Mini.Visible = true
 end)
 
+-- Arrastrar boton minimizado (PC y movil)
+local miniDragging = false
+local miniDragStart
+local miniStartPos
+local miniDragInput
+local miniWasDragged = false
+
+Mini.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        miniDragging = true
+        miniWasDragged = false
+        miniDragStart = input.Position
+        miniStartPos = Mini.Position
+
+        if input.UserInputType == Enum.UserInputType.Touch then
+            miniDragInput = input
+        end
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                miniDragging = false
+            end
+        end)
+    end
+end)
+
+Mini.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        miniDragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not miniDragging or input ~= miniDragInput then
+        return
+    end
+
+    local delta = input.Position - miniDragStart
+    if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
+        miniWasDragged = true
+    end
+
+    if miniWasDragged then
+        Mini.Position = UDim2.new(
+            miniStartPos.X.Scale,
+            miniStartPos.X.Offset + delta.X,
+            miniStartPos.Y.Scale,
+            miniStartPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
 -- Restoree
 Mini.MouseButton1Click:Connect(function()
+    if miniWasDragged then
+        return
+    end
     Main.Visible = true
     Mini.Visible = false
 end)
