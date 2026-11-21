@@ -75,7 +75,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.2"
+Version.Text = "v1.1"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -288,29 +288,26 @@ local AutoDumbellEnabled = createOption(
 )
 addToSection("Farming", "AUTO DUMBELL", "Farming_AutoDumbell")
 
--- auto benches
+-- FARMING: AUTO BENCH (se mantiene el orden de eventos original)
 local AutoBenchEnabled = createOption(
     "AUTO BENCH", "Health farm", 173,
     {
         {remote = PushUp},
         {remote = Bench},
+        {remote = PushUp},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
+        {remote = PushUp},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
+        {remote = PushUp},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
-        {remote = Bench},
         {remote = PushUp},
-        {remote = Bench},
-        {remote = Bench},
-        {remote = PushUp},
-        {remote = Bench},
-        {remote = Bench},
-     
+        {remote = Bench}
     }
 )
 addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
@@ -327,7 +324,7 @@ local KillAuraEnabled = createOption(
 )
 addToSection("Farming", "KILL AURA", "Farming_KillAura")
 
--- aura 676767
+-- PVP: KILL AURA (mismos eventos; interruptor independiente)
 local PvpKillAuraEnabled = createOption(
     "KILL AURA", "Strength farm", 101,
     {
@@ -347,11 +344,12 @@ local SpamSweepEnabled = createOption(
 addToSection("PVP", "SPAM SWEEP", "PVP_SpamSweep")
 
 -- PVP: ANTI FLING
--- Conserva los limites y la logica del Anti-Fling proporcionado.
+-- Proteccion actualizada, colisiones desactivadas y limites nuevos.
 local RunService = game:GetService("RunService")
-local MAX_SPEED = 180
-local MAX_SPIN = 100
+local MAX_SPEED = 140
+local MAX_SPIN = 70
 local SafePos
+local Targets = {}
 
 local FlingOption = Instance.new("Frame")
 FlingOption.Name = "PVP_AntiFling"
@@ -403,7 +401,77 @@ FlingToggle.Parent = FlingOption
 
 local flingActive = false
 local flingHeartbeatConnection
+local flingSimulationConnection
 local flingCharacterConnection
+local flingPlayerAddedConnection
+local flingPlayerRemovingConnection
+local flingPlayerConnections = {}
+local flingDescendantConnections = {}
+
+local function disconnectTarget(playerToClear)
+    local connections = flingPlayerConnections[playerToClear]
+    if connections then
+        for _, connection in ipairs(connections) do
+            connection:Disconnect()
+        end
+        flingPlayerConnections[playerToClear] = nil
+    end
+    if flingDescendantConnections[playerToClear] then
+        flingDescendantConnections[playerToClear]:Disconnect()
+        flingDescendantConnections[playerToClear] = nil
+    end
+    local parts = Targets[playerToClear]
+    if parts then
+        for part, originalCanCollide in pairs(parts) do
+            if part.Parent then
+                part.CanCollide = originalCanCollide
+            end
+        end
+        Targets[playerToClear] = nil
+    end
+end
+
+local function protectPlayer(otherPlayer)
+    if otherPlayer == player or flingPlayerConnections[otherPlayer] then return end
+
+    local connections = {}
+    flingPlayerConnections[otherPlayer] = connections
+
+    local function onCharacter(char)
+        if flingDescendantConnections[otherPlayer] then
+            flingDescendantConnections[otherPlayer]:Disconnect()
+            flingDescendantConnections[otherPlayer] = nil
+        end
+        local oldParts = Targets[otherPlayer]
+        if oldParts then
+            for part, original in pairs(oldParts) do
+                if part.Parent then part.CanCollide = original end
+            end
+        end
+        local parts = {}
+        Targets[otherPlayer] = parts
+
+        local function addPart(obj)
+            if not flingActive then return end
+            if obj:IsA("BasePart") then
+                if parts[obj] == nil then
+                    parts[obj] = obj.CanCollide
+                end
+                obj.CanCollide = false
+            end
+        end
+
+        for _, obj in ipairs(char:GetDescendants()) do
+            addPart(obj)
+        end
+        flingDescendantConnections[otherPlayer] = char.DescendantAdded:Connect(addPart)
+    end
+
+    table.insert(connections, otherPlayer.CharacterAdded:Connect(onCharacter))
+    if otherPlayer.Character then
+        onCharacter(otherPlayer.Character)
+    end
+end
 
 local function stopAntiFling()
     flingActive = false
@@ -411,9 +479,24 @@ local function stopAntiFling()
         flingHeartbeatConnection:Disconnect()
         flingHeartbeatConnection = nil
     end
+    if flingSimulationConnection then
+        flingSimulationConnection:Disconnect()
+        flingSimulationConnection = nil
+    end
     if flingCharacterConnection then
         flingCharacterConnection:Disconnect()
         flingCharacterConnection = nil
+    end
+    if flingPlayerAddedConnection then
+        flingPlayerAddedConnection:Disconnect()
+        flingPlayerAddedConnection = nil
+    end
+    if flingPlayerRemovingConnection then
+        flingPlayerRemovingConnection:Disconnect()
+        flingPlayerRemovingConnection = nil
+    end
+    for otherPlayer in pairs(flingPlayerConnections) do
+        disconnectTarget(otherPlayer)
     end
     SafePos = nil
     if FlingToggle.Parent then
@@ -432,6 +515,25 @@ FlingToggle.MouseButton1Click:Connect(function()
 
     flingActive = true
     SafePos = nil
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        protectPlayer(otherPlayer)
+    end
+    flingPlayerAddedConnection = Players.PlayerAdded:Connect(protectPlayer)
+    flingPlayerRemovingConnection = Players.PlayerRemoving:Connect(disconnectTarget)
+
+    flingSimulationConnection = RunService.PreSimulation:Connect(function()
+        for _, parts in pairs(Targets) do
+            for part in pairs(parts) do
+                if part.Parent then
+                    part.CanCollide = false
+                else
+                    parts[part] = nil
+                end
+            end
+        end
+    end)
+
     flingCharacterConnection = player.CharacterAdded:Connect(function()
         SafePos = nil
     end)
@@ -448,8 +550,11 @@ FlingToggle.MouseButton1Click:Connect(function()
         if speed > MAX_SPEED or spin > MAX_SPIN then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
-            if SafePos then char:PivotTo(SafePos) end
-        elseif speed < 45 and spin < 25 then
+            if SafePos then
+                char:PivotTo(SafePos)
+            end
+        elseif speed < 45 and spin < 25
+            and hum.FloorMaterial ~= Enum.Material.Air then
             SafePos = root.CFrame
         end
     end)
@@ -461,7 +566,7 @@ end)
 
 table.insert(controllers, stopAntiFling)
 
--- blocks
+-- PVP: BLOCK (cada 0.5 segundos mientras este activado)
 local BlockEvent = Remotes:WaitForChild("Block")
 
 local BlockOption = Instance.new("Frame")
@@ -494,7 +599,7 @@ local BlockNote = Instance.new("TextLabel")
 BlockNote.Size = UDim2.new(0, 175, 0, 18)
 BlockNote.Position = UDim2.new(0, 12, 0, 32)
 BlockNote.BackgroundTransparency = 1
-BlockNote.Text = "block on"
+BlockNote.Text = "Auto block / 0.5s"
 BlockNote.TextColor3 = MUTED
 BlockNote.Font = Enum.Font.Code
 BlockNote.TextSize = 11
@@ -541,7 +646,7 @@ BlockToggle.MouseButton1Click:Connect(function()
 
     task.spawn(function()
         while running and blockActive and blockGeneration == thisGeneration and ScreenGui.Parent do
-            task.wait(1)
+            task.wait(0.5)
             if not running or not blockActive or blockGeneration ~= thisGeneration or not ScreenGui.Parent then
                 break
             end
