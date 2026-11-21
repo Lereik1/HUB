@@ -288,26 +288,29 @@ local AutoDumbellEnabled = createOption(
 )
 addToSection("Farming", "AUTO DUMBELL", "Farming_AutoDumbell")
 
--- FARMING: AUTO BENCH (se mantiene el orden de eventos original)
+-- auto benches
 local AutoBenchEnabled = createOption(
     "AUTO BENCH", "Health farm", 173,
     {
         {remote = PushUp},
         {remote = Bench},
-        {remote = PushUp},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
-        {remote = PushUp},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
-        {remote = PushUp},
         {remote = Bench},
         {remote = PushUp},
         {remote = Bench},
+        {remote = Bench},
         {remote = PushUp},
-        {remote = Bench}
+        {remote = Bench},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = Bench},
+     
     }
 )
 addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
@@ -324,7 +327,7 @@ local KillAuraEnabled = createOption(
 )
 addToSection("Farming", "KILL AURA", "Farming_KillAura")
 
--- PVP: KILL AURA (mismos eventos; interruptor independiente)
+-- aura 676767
 local PvpKillAuraEnabled = createOption(
     "KILL AURA", "Strength farm", 101,
     {
@@ -458,7 +461,7 @@ end)
 
 table.insert(controllers, stopAntiFling)
 
--- PVP: BLOCK (cada 0.5 segundos mientras este activado)
+-- blocks
 local BlockEvent = Remotes:WaitForChild("Block")
 
 local BlockOption = Instance.new("Frame")
@@ -491,7 +494,7 @@ local BlockNote = Instance.new("TextLabel")
 BlockNote.Size = UDim2.new(0, 175, 0, 18)
 BlockNote.Position = UDim2.new(0, 12, 0, 32)
 BlockNote.BackgroundTransparency = 1
-BlockNote.Text = "Auto block / 0.5s"
+BlockNote.Text = "block on"
 BlockNote.TextColor3 = MUTED
 BlockNote.Font = Enum.Font.Code
 BlockNote.TextSize = 11
@@ -538,7 +541,7 @@ BlockToggle.MouseButton1Click:Connect(function()
 
     task.spawn(function()
         while running and blockActive and blockGeneration == thisGeneration and ScreenGui.Parent do
-            task.wait(0.5)
+            task.wait(1)
             if not running or not blockActive or blockGeneration ~= thisGeneration or not ScreenGui.Parent then
                 break
             end
