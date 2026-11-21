@@ -872,8 +872,8 @@ local function addHitboxPlayer()
         HitboxStatus.Text = "Jugador no encontrado o ambiguo"
         return
     end
-    if not size or size < 2 or size > 35 then
-        HitboxStatus.Text = "Tamano invalido: usa 2 a 35"
+    if not size or size < 2 or size > 999 then
+        HitboxStatus.Text = "Tamano invalido: usa 2 a 999"
         return
     end
     if hitboxEntries[target.UserId] then
@@ -949,9 +949,9 @@ local function addHitboxPlayer()
     end)
     sizeField.FocusLost:Connect(function()
         local nextSize = tonumber(sizeField.Text)
-        if not nextSize or nextSize < 2 or nextSize > 35 then
+        if not nextSize or nextSize < 2 or nextSize > 999 then
             sizeField.Text = tostring(entry.size)
-            HitboxStatus.Text = "Tamano invalido: usa 2 a 35"
+            HitboxStatus.Text = "Tamano invalido: usa 2 a 999"
             return
         end
         if nextSize ~= entry.size then
