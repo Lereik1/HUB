@@ -458,6 +458,97 @@ end)
 
 table.insert(controllers, stopAntiFling)
 
+-- PVP: BLOCK (cada 0.5 segundos mientras este activado)
+local BlockEvent = Remotes:WaitForChild("Block")
+
+local BlockOption = Instance.new("Frame")
+BlockOption.Name = "PVP_Block"
+BlockOption.Size = UDim2.new(1, -26, 0, 62)
+BlockOption.Position = UDim2.new(0, 13, 0, 317)
+BlockOption.BackgroundColor3 = PANEL
+BlockOption.BorderSizePixel = 0
+BlockOption.Parent = Main
+table.insert(sections.PVP, BlockOption)
+
+local BlockIndicator = Instance.new("Frame")
+BlockIndicator.Size = UDim2.new(0, 3, 1, 0)
+BlockIndicator.BackgroundColor3 = OFF
+BlockIndicator.BorderSizePixel = 0
+BlockIndicator.Parent = BlockOption
+
+local BlockLabel = Instance.new("TextLabel")
+BlockLabel.Size = UDim2.new(0, 170, 0, 24)
+BlockLabel.Position = UDim2.new(0, 12, 0, 9)
+BlockLabel.BackgroundTransparency = 1
+BlockLabel.Text = "BLOCK"
+BlockLabel.TextColor3 = TEXT
+BlockLabel.Font = Enum.Font.GothamBold
+BlockLabel.TextSize = 13
+BlockLabel.TextXAlignment = Enum.TextXAlignment.Left
+BlockLabel.Parent = BlockOption
+
+local BlockNote = Instance.new("TextLabel")
+BlockNote.Size = UDim2.new(0, 175, 0, 18)
+BlockNote.Position = UDim2.new(0, 12, 0, 32)
+BlockNote.BackgroundTransparency = 1
+BlockNote.Text = "Auto block / 0.5s"
+BlockNote.TextColor3 = MUTED
+BlockNote.Font = Enum.Font.Code
+BlockNote.TextSize = 11
+BlockNote.TextXAlignment = Enum.TextXAlignment.Left
+BlockNote.Parent = BlockOption
+
+local BlockToggle = Instance.new("TextButton")
+BlockToggle.Size = UDim2.new(0, 56, 0, 29)
+BlockToggle.Position = UDim2.new(1, -68, 0, 16)
+BlockToggle.BackgroundColor3 = OFF
+BlockToggle.BorderSizePixel = 0
+BlockToggle.Text = "OFF"
+BlockToggle.TextColor3 = TEXT
+BlockToggle.Font = Enum.Font.GothamBold
+BlockToggle.TextSize = 12
+BlockToggle.Parent = BlockOption
+
+local blockActive = false
+local blockGeneration = 0
+
+local function stopBlock()
+    blockActive = false
+    blockGeneration += 1
+    if BlockToggle.Parent then
+        BlockToggle.Text = "OFF"
+        BlockToggle.BackgroundColor3 = OFF
+        BlockIndicator.BackgroundColor3 = OFF
+    end
+end
+
+BlockToggle.MouseButton1Click:Connect(function()
+    if not running then return end
+    if blockActive then
+        stopBlock()
+        return
+    end
+
+    blockActive = true
+    blockGeneration += 1
+    local thisGeneration = blockGeneration
+    BlockToggle.Text = "ON"
+    BlockToggle.BackgroundColor3 = PURPLE
+    BlockIndicator.BackgroundColor3 = PURPLE
+
+    task.spawn(function()
+        while running and blockActive and blockGeneration == thisGeneration and ScreenGui.Parent do
+            task.wait(0.5)
+            if not running or not blockActive or blockGeneration ~= thisGeneration or not ScreenGui.Parent then
+                break
+            end
+            BlockEvent:FireServer("Begin")
+        end
+    end)
+end)
+
+table.insert(controllers, stopBlock)
+
 -- UTILITIES: ANTI AFK (nuevo; no modifica createOption)
 local AFKOption = Instance.new("Frame")
 AFKOption.Name = "Utilities_AntiAFK"
