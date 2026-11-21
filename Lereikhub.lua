@@ -261,8 +261,23 @@ createTab("Farming", 1)
 createTab("PVP", 2)
 createTab("Utilities", 3)
 
+-- Area desplazable exclusiva de PVP (sin aumentar el tamano del HUB)
+local PVPScroll = Instance.new("ScrollingFrame")
+PVPScroll.Name = "PVPScroll"
+PVPScroll.Size = UDim2.new(1, 0, 0, 285)
+PVPScroll.Position = UDim2.new(0, 0, 0, 94)
+PVPScroll.BackgroundTransparency = 1
+PVPScroll.BorderSizePixel = 0
+PVPScroll.ScrollBarThickness = 3
+PVPScroll.ScrollBarImageColor3 = PURPLE
+PVPScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+PVPScroll.CanvasSize = UDim2.new(0, 0, 0, 470)
+PVPScroll.Visible = false
+PVPScroll.Parent = Main
+
 local function showSection(section)
     currentSection = section
+    PVPScroll.Visible = (section == "PVP")
     for name, items in pairs(sections) do
         for _, option in ipairs(items) do
             option.Visible = (name == section)
@@ -295,15 +310,6 @@ local AutoBenchEnabled = createOption(
         {remote = PushUp},
         {remote = Bench},
         {remote = Bench},
-        {remote = PushUp},
-        {remote = Bench},
-        {remote = Bench},
-        {remote = Bench},
-        {remote = PushUp},
-        {remote = Bench},
-        {remote = Bench},
-        {remote = PushUp},
-        {remote = Bench},
         {remote = Bench},
         {remote = Bench},
         {remote = PushUp},
@@ -311,7 +317,15 @@ local AutoBenchEnabled = createOption(
         {remote = Bench},
         {remote = Bench},
         {remote = Bench},
-        
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = Bench},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = Bench},
+        {remote = Bench},
     }
 )
 addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
@@ -344,7 +358,7 @@ addToSection("PVP", "KILL AURA", "PVP_KillAura")
 local SpamSweepEnabled = createOption(
     "SPAM SWEEP", "Test version", 173,
     {{remote = Stun, repetitions = 1}},
-    0.6
+    0.61
 )
 addToSection("PVP", "SPAM SWEEP", "PVP_SpamSweep")
 
@@ -604,7 +618,7 @@ local BlockNote = Instance.new("TextLabel")
 BlockNote.Size = UDim2.new(0, 175, 0, 18)
 BlockNote.Position = UDim2.new(0, 12, 0, 32)
 BlockNote.BackgroundTransparency = 1
-BlockNote.Text = "always block on"
+BlockNote.Text = "always Block on"
 BlockNote.TextColor3 = MUTED
 BlockNote.Font = Enum.Font.Code
 BlockNote.TextSize = 11
@@ -651,7 +665,7 @@ BlockToggle.MouseButton1Click:Connect(function()
 
     task.spawn(function()
         while running and blockActive and blockGeneration == thisGeneration and ScreenGui.Parent do
-            task.wait(1)
+            task.wait(1.5)
             if not running or not blockActive or blockGeneration ~= thisGeneration or not ScreenGui.Parent then
                 break
             end
@@ -661,6 +675,207 @@ BlockToggle.MouseButton1Click:Connect(function()
 end)
 
 table.insert(controllers, stopBlock)
+
+-- PVP: HITBOX EXPANDER (campos y tamano ajustable)
+-- El cambio de tamano es local: depende de las reglas de replicacion del juego.
+local HitboxOption = Instance.new("Frame")
+HitboxOption.Name = "PVP_HitboxExpander"
+HitboxOption.Size = UDim2.new(1, -26, 0, 160)
+HitboxOption.Position = UDim2.new(0, 13, 0, 389)
+HitboxOption.BackgroundColor3 = PANEL
+HitboxOption.BorderSizePixel = 0
+HitboxOption.Parent = Main
+table.insert(sections.PVP, HitboxOption)
+
+local HitboxIndicator = Instance.new("Frame")
+HitboxIndicator.Size = UDim2.new(0, 3, 1, 0)
+HitboxIndicator.BackgroundColor3 = OFF
+HitboxIndicator.BorderSizePixel = 0
+HitboxIndicator.Parent = HitboxOption
+
+local HitboxLabel = Instance.new("TextLabel")
+HitboxLabel.Size = UDim2.new(0, 175, 0, 24)
+HitboxLabel.Position = UDim2.new(0, 12, 0, 7)
+HitboxLabel.BackgroundTransparency = 1
+HitboxLabel.Text = "HITBOX EXPANDER"
+HitboxLabel.TextColor3 = TEXT
+HitboxLabel.Font = Enum.Font.GothamBold
+HitboxLabel.TextSize = 13
+HitboxLabel.TextXAlignment = Enum.TextXAlignment.Left
+HitboxLabel.Parent = HitboxOption
+
+local HitboxToggle = Instance.new("TextButton")
+HitboxToggle.Size = UDim2.new(0, 56, 0, 29)
+HitboxToggle.Position = UDim2.new(1, -68, 0, 8)
+HitboxToggle.BackgroundColor3 = OFF
+HitboxToggle.BorderSizePixel = 0
+HitboxToggle.Text = "OFF"
+HitboxToggle.TextColor3 = TEXT
+HitboxToggle.Font = Enum.Font.GothamBold
+HitboxToggle.TextSize = 12
+HitboxToggle.Parent = HitboxOption
+
+local function hitboxField(placeholder, y, initial)
+    local field = Instance.new("TextBox")
+    field.Size = UDim2.new(1, -24, 0, 30)
+    field.Position = UDim2.new(0, 12, 0, y)
+    field.BackgroundColor3 = BG
+    field.BorderSizePixel = 0
+    field.PlaceholderText = placeholder
+    field.PlaceholderColor3 = MUTED
+    field.Text = initial or ""
+    field.TextColor3 = TEXT
+    field.Font = Enum.Font.GothamMedium
+    field.TextSize = 12
+    field.TextXAlignment = Enum.TextXAlignment.Left
+    field.ClearTextOnFocus = false
+    field.Parent = HitboxOption
+    local inset = Instance.new("UIPadding")
+    inset.PaddingLeft = UDim.new(0, 9)
+    inset.PaddingRight = UDim.new(0, 9)
+    inset.Parent = field
+    return field
+end
+
+local HitboxName = hitboxField("Nombre del jugador", 43, "")
+local HitboxSize = hitboxField("Tamano de hitbox (2 - 35)", 80, "10")
+
+local HitboxStatus = Instance.new("TextLabel")
+HitboxStatus.Size = UDim2.new(1, -24, 0, 22)
+HitboxStatus.Position = UDim2.new(0, 12, 0, 120)
+HitboxStatus.BackgroundTransparency = 1
+HitboxStatus.Text = "Escribe nombre y tamano; activa ON"
+HitboxStatus.TextColor3 = MUTED
+HitboxStatus.Font = Enum.Font.Code
+HitboxStatus.TextSize = 10
+HitboxStatus.TextXAlignment = Enum.TextXAlignment.Left
+HitboxStatus.Parent = HitboxOption
+
+local hitboxActive = false
+local trackedPlayer
+local respawnConnection
+local currentRoot
+local originalSize
+local originalTransparency
+local originalCanCollide
+
+local function restoreHitbox()
+    if currentRoot and currentRoot.Parent then
+        pcall(function()
+            currentRoot.Size = originalSize
+            currentRoot.Transparency = originalTransparency
+            currentRoot.CanCollide = originalCanCollide
+        end)
+    end
+    currentRoot = nil
+    originalSize = nil
+    originalTransparency = nil
+    originalCanCollide = nil
+end
+
+local function stopHitbox()
+    hitboxActive = false
+    if respawnConnection then
+        respawnConnection:Disconnect()
+        respawnConnection = nil
+    end
+    trackedPlayer = nil
+    restoreHitbox()
+    if HitboxToggle.Parent then
+        HitboxToggle.Text = "OFF"
+        HitboxToggle.BackgroundColor3 = OFF
+        HitboxIndicator.BackgroundColor3 = OFF
+        HitboxStatus.Text = "Desactivado"
+    end
+end
+
+local function findTarget(text)
+    text = text:lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if text == "" then return nil end
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player and other.Name:lower() == text then
+            return other
+        end
+    end
+    local match
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player and (
+            other.Name:lower():sub(1, #text) == text
+            or other.DisplayName:lower():sub(1, #text) == text
+        ) then
+            if match then return nil end -- Nombre ambiguo
+            match = other
+        end
+    end
+    return match
+end
+
+local function applyHitbox(character)
+    if not hitboxActive or not trackedPlayer then return end
+    local root = character:WaitForChild("HumanoidRootPart", 8)
+    if not hitboxActive or not trackedPlayer or trackedPlayer.Character ~= character or not root then
+        return
+    end
+    local newSize = tonumber(HitboxSize.Text)
+    if not newSize or newSize < 2 or newSize > 35 then
+        HitboxStatus.Text = "Tamano invalido: usa 2 a 35"
+        return
+    end
+    restoreHitbox()
+    currentRoot = root
+    originalSize = root.Size
+    originalTransparency = root.Transparency
+    originalCanCollide = root.CanCollide
+    root.Size = Vector3.new(newSize, newSize, newSize)
+    root.Transparency = 0.65
+    root.CanCollide = false
+    HitboxStatus.Text = "Activo: " .. trackedPlayer.Name .. " | " .. tostring(newSize)
+end
+
+local function startHitbox()
+    if not running then return end
+    local target = findTarget(HitboxName.Text)
+    local newSize = tonumber(HitboxSize.Text)
+    if not target then
+        HitboxStatus.Text = "Jugador no encontrado o ambiguo"
+        return
+    end
+    if not newSize or newSize < 2 or newSize > 35 then
+        HitboxStatus.Text = "Tamano invalido: usa 2 a 35"
+        return
+    end
+    hitboxActive = true
+    trackedPlayer = target
+    HitboxToggle.Text = "ON"
+    HitboxToggle.BackgroundColor3 = PURPLE
+    HitboxIndicator.BackgroundColor3 = PURPLE
+    respawnConnection = target.CharacterAdded:Connect(function(character)
+        task.spawn(applyHitbox, character)
+    end)
+    if target.Character then task.spawn(applyHitbox, target.Character) end
+end
+
+HitboxToggle.MouseButton1Click:Connect(function()
+    if hitboxActive then stopHitbox() else startHitbox() end
+end)
+
+local function refreshHitbox()
+    if hitboxActive then
+        stopHitbox()
+        startHitbox()
+    end
+end
+HitboxName.FocusLost:Connect(refreshHitbox)
+HitboxSize.FocusLost:Connect(refreshHitbox)
+
+table.insert(controllers, stopHitbox)
+
+-- Colocar las cuatro opciones originales y la nueva dentro del scroll PVP.
+-- Se conservan sus coordenadas relativas, apariencia y funciones.
+for _, option in ipairs(sections.PVP) do
+    option.Position = UDim2.new(0, 13, 0, option.Position.Y.Offset - 94)
+    option.Parent = PVPScroll
+end
 
 -- UTILITIES: ANTI AFK (nuevo; no modifica createOption)
 local AFKOption = Instance.new("Frame")
