@@ -227,11 +227,94 @@ local function createOption(name, note, y, remoteEvents, interval)
     end
 end
 
--- OPCION 1: KILL AURA
+-- PESTAÑAS: se conserva la función createOption sin modificaciones
+local sections = { Farming = {}, PVP = {}, Utilities = {} }
+local tabs = {}
+local currentSection = "Farming"
+
+local function addToSection(section, name, identifier)
+    local item = Main:FindFirstChild(name)
+    if item then
+        item.Name = identifier
+        item.Visible = (section == currentSection)
+        table.insert(sections[section], item)
+    end
+end
+
+local function createTab(name, index)
+    local tab = Instance.new("TextButton")
+    tab.Name = "Tab_" .. name
+    tab.Size = UDim2.new(0, 83, 0, 29)
+    tab.Position = UDim2.new(0, 13 + (index - 1) * 91, 0, 58)
+    tab.BackgroundColor3 = PANEL
+    tab.BorderSizePixel = 0
+    tab.Text = name
+    tab.TextColor3 = MUTED
+    tab.Font = Enum.Font.GothamMedium
+    tab.TextSize = 12
+    tab.Parent = Main
+    tabs[name] = tab
+    return tab
+end
+
+createTab("Farming", 1)
+createTab("PVP", 2)
+createTab("Utilities", 3)
+
+local function showSection(section)
+    currentSection = section
+    for name, items in pairs(sections) do
+        for _, option in ipairs(items) do
+            option.Visible = (name == section)
+        end
+    end
+    for name, tab in pairs(tabs) do
+        local selected = (name == section)
+        tab.BackgroundColor3 = selected and PURPLE or PANEL
+        tab.TextColor3 = selected and TEXT or MUTED
+    end
+end
+
+for name, tab in pairs(tabs) do
+    tab.MouseButton1Click:Connect(function()
+        showSection(name)
+    end)
+end
+
+-- FARMING: AUTO DUMBELL
+local AutoDumbellEnabled = createOption(
+    "AUTO DUMBELL", "farm strength", 101,
+    {{remote = Dumbell, args = {"Rep", 1}}}, 0
+)
+addToSection("Farming", "AUTO DUMBELL", "Farming_AutoDumbell")
+
+-- FARMING: AUTO BENCH (se mantiene el orden de eventos original)
+local AutoBenchEnabled = createOption(
+    "AUTO BENCH", "Health farm", 173,
+    {
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench},
+        {remote = PushUp},
+        {remote = Bench}
+    }
+)
+addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
+
+-- FARMING: KILL AURA
 local KillAuraEnabled = createOption(
-    "KILL AURA",
-    "Strength farm",
-    85,
+    "KILL AURA", "Strength farm", 245,
     {
         {remote = JumpKick},
         {remote = HandKick},
@@ -239,53 +322,123 @@ local KillAuraEnabled = createOption(
         {remote = DoubleReg}
     }
 )
+addToSection("Farming", "KILL AURA", "Farming_KillAura")
 
--- OPCION 2: SPAM SWEEP
+-- PVP: KILL AURA (mismos eventos; interruptor independiente)
+local PvpKillAuraEnabled = createOption(
+    "KILL AURA", "Strength farm", 101,
+    {
+        {remote = JumpKick},
+        {remote = HandKick},
+        {remote = JumpKick, args = {2}},
+        {remote = DoubleReg}
+    }
+)
+addToSection("PVP", "KILL AURA", "PVP_KillAura")
+
+-- PVP: SPAM SWEEP
 local SpamSweepEnabled = createOption(
-    "SPAM SWEEP",
-    "Test version",
-    157,
-    {
-        {remote = Stun}
-    }
+    "SPAM SWEEP", "Test version", 173,
+    {{remote = Stun}}
 )
+addToSection("PVP", "SPAM SWEEP", "PVP_SpamSweep")
 
--- OPCION 3: AUTO BENCH
-local AutoBenchEnabled = createOption(
-    "AUTO BENCH",
-    "Health farm",
-    229,
-    {
-        {remote = PushUp},
-        {remote = Bench},
-        {remote = PushUp},
-        {remote = Bench}
-        {remote = PushUp},
-        {remote = Bench}
-        {remote = PushUp},
-        {remote = Bench}
-        {remote = PushUp},
-        {remote = Bench}
-        {remote = PushUp},
-        {remote = Bench}
-        {remote = PushUp},
-        {remote = Bench}
-        {remote = PushUp},
-        {remote = Bench}
-   
-    }
-)
+-- UTILITIES: ANTI AFK (nuevo; no modifica createOption)
+local AFKOption = Instance.new("Frame")
+AFKOption.Name = "Utilities_AntiAFK"
+AFKOption.Size = UDim2.new(1, -26, 0, 62)
+AFKOption.Position = UDim2.new(0, 13, 0, 101)
+AFKOption.BackgroundColor3 = PANEL
+AFKOption.BorderSizePixel = 0
+AFKOption.Parent = Main
 
--- OPCION 4: AUTO DUMBELL
-local AutoDumbellEnabled = createOption(
-    "AUTO DUMBELL",
-    "farm strength",
-    301,
-    {
-        {remote = Dumbell, args = {"Rep", 1}}
-    },
-    0
-)
+table.insert(sections.Utilities, AFKOption)
+
+local AFKIndicator = Instance.new("Frame")
+AFKIndicator.Size = UDim2.new(0, 3, 1, 0)
+AFKIndicator.BackgroundColor3 = OFF
+AFKIndicator.BorderSizePixel = 0
+AFKIndicator.Parent = AFKOption
+
+local AFKLabel = Instance.new("TextLabel")
+AFKLabel.Size = UDim2.new(0, 170, 0, 24)
+AFKLabel.Position = UDim2.new(0, 12, 0, 9)
+AFKLabel.BackgroundTransparency = 1
+AFKLabel.Text = "ANTI AFK"
+AFKLabel.TextColor3 = TEXT
+AFKLabel.Font = Enum.Font.GothamBold
+AFKLabel.TextSize = 13
+AFKLabel.TextXAlignment = Enum.TextXAlignment.Left
+AFKLabel.Parent = AFKOption
+
+local AFKNote = Instance.new("TextLabel")
+AFKNote.Size = UDim2.new(0, 175, 0, 18)
+AFKNote.Position = UDim2.new(0, 12, 0, 32)
+AFKNote.BackgroundTransparency = 1
+AFKNote.Text = "Idle protection"
+AFKNote.TextColor3 = MUTED
+AFKNote.Font = Enum.Font.Code
+AFKNote.TextSize = 11
+AFKNote.TextXAlignment = Enum.TextXAlignment.Left
+AFKNote.Parent = AFKOption
+
+local AFKToggle = Instance.new("TextButton")
+AFKToggle.Size = UDim2.new(0, 56, 0, 29)
+AFKToggle.Position = UDim2.new(1, -68, 0, 16)
+AFKToggle.BackgroundColor3 = OFF
+AFKToggle.BorderSizePixel = 0
+AFKToggle.Text = "OFF"
+AFKToggle.TextColor3 = TEXT
+AFKToggle.Font = Enum.Font.GothamBold
+AFKToggle.TextSize = 12
+AFKToggle.Parent = AFKOption
+
+local afkActive = false
+local afkConnection = nil
+
+local function stopAntiAFK()
+    afkActive = false
+    if afkConnection then
+        afkConnection:Disconnect()
+        afkConnection = nil
+    end
+    if AFKToggle.Parent then
+        AFKToggle.Text = "OFF"
+        AFKToggle.BackgroundColor3 = OFF
+        AFKIndicator.BackgroundColor3 = OFF
+    end
+end
+
+AFKToggle.MouseButton1Click:Connect(function()
+    if not running then return end
+    if afkActive then
+        stopAntiAFK()
+        return
+    end
+    local ok, connection = pcall(function()
+        local VirtualUser = game:GetService("VirtualUser")
+        return Players.LocalPlayer.Idled:Connect(function()
+            if not afkActive then return end
+            pcall(function()
+                warn("anti-afk")
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end)
+    end)
+    if ok and connection then
+        afkConnection = connection
+        afkActive = true
+        AFKToggle.Text = "ON"
+        AFKToggle.BackgroundColor3 = PURPLE
+        AFKIndicator.BackgroundColor3 = PURPLE
+    else
+        warn("No se pudo activar ANTI AFK")
+    end
+end)
+
+table.insert(controllers, stopAntiAFK)
+showSection("Farming")
 
 -- boton chido
 local Mini = Instance.new("TextButton")
