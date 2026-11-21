@@ -75,7 +75,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.1"
+Version.Text = "v1.2"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -190,7 +190,7 @@ local function createOption(name, note, y, remoteEvents, interval)
 
                 for _, action in ipairs(remoteEvents) do
                     -- Cada evento se ejecuta dos veces
-                    for i = 1, 2 do
+                    for i = 1, (action.repetitions or 2) do
                         if not running
                             or not Active
                             or generation ~= currentGeneration then
@@ -339,7 +339,8 @@ addToSection("PVP", "KILL AURA", "PVP_KillAura")
 -- PVP: SPAM SWEEP
 local SpamSweepEnabled = createOption(
     "SPAM SWEEP", "Test version", 173,
-    {{remote = Stun}}
+    {{remote = Stun, repetitions = 1}},
+    0.7
 )
 addToSection("PVP", "SPAM SWEEP", "PVP_SpamSweep")
 
@@ -599,7 +600,7 @@ local BlockNote = Instance.new("TextLabel")
 BlockNote.Size = UDim2.new(0, 175, 0, 18)
 BlockNote.Position = UDim2.new(0, 12, 0, 32)
 BlockNote.BackgroundTransparency = 1
-BlockNote.Text = "Auto block / 0.5s"
+BlockNote.Text = "always block on"
 BlockNote.TextColor3 = MUTED
 BlockNote.Font = Enum.Font.Code
 BlockNote.TextSize = 11
@@ -646,7 +647,7 @@ BlockToggle.MouseButton1Click:Connect(function()
 
     task.spawn(function()
         while running and blockActive and blockGeneration == thisGeneration and ScreenGui.Parent do
-            task.wait(0.5)
+            task.wait(1)
             if not running or not blockActive or blockGeneration ~= thisGeneration or not ScreenGui.Parent then
                 break
             end
