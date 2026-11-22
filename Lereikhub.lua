@@ -371,15 +371,15 @@ addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
 -- FARMING: KILL AURA (JumpKick, sin cooldown fijo)
 local KillAuraEnabled = createOption(
     "KILL AURA", "farm strength and attack", 245,
-    {{remote = JumpKick, repetitions = 1}},
+    {{remote = JumpKick, repetitions = 11}},
     0, "Farming_KillAura"
 )
 addToSection("Farming", "KILL AURA", "Farming_KillAura")
 
 -- PVP: KILL AURA (JumpKick, sin cooldown fijo, interruptor independiente)
 local PvpKillAuraEnabled = createOption(
-    "KILL AURA", "farm strength", 101,
-    {{remote = JumpKick, repetitions = 20}},
+    "KILL AURA", "farm strength and attack", 101,
+    {{remote = JumpKick, repetitions = 11}},
     0, "PVP_KillAura"
 )
 addToSection("PVP", "KILL AURA", "PVP_KillAura")
