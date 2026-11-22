@@ -51,7 +51,7 @@ end
 
 local INTERVAL = 0
 
--- Exclusivamente para los dos KILL AURA: evita activar JumpKick
+-- Exclusivamente para KILL AURA PVP: evita activar JumpKick
 -- si no hay otro jugador cercano fuera de SafeZone o hay alguien
 -- protegido cerca. JumpKick no admite un objetivo especifico.
 local KILL_AURA_RANGE = 15
@@ -268,7 +268,7 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                             break
                         end
 
-                        if saveKey == "Farming_KillAura" or saveKey == "PVP_KillAura" then
+                        if saveKey == "PVP_KillAura" then
                             if canKillAuraAttack() then
                                 action.remote:FireServer()
                             end
