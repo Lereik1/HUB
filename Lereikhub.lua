@@ -284,7 +284,7 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                     -- PVP: una llamada por ciclo, sin rafagas pendientes.
                     -- El resto conserva exactamente sus repeticiones.
                     local repeats = action.repetitions or 2
-                    for i = 2, repeats do
+                    for i = 1, repeats do
                         if not running
                             or not Active
                             or generation ~= currentGeneration then
@@ -434,7 +434,7 @@ addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
 -- FARMING: KILL AURA (JumpKick, sin cooldown fijo)
 local KillAuraEnabled = createOption(
     "KILL AURA", "farm strength and attack", 245,
-    {{remote = JumpKick, repetitions = 13}},
+    {{remote = JumpKick, repetitions = 12}},
     0, "Farming_KillAura"
 )
 addToSection("Farming", "KILL AURA", "Farming_KillAura")
@@ -442,7 +442,7 @@ addToSection("Farming", "KILL AURA", "Farming_KillAura")
 -- PVP: KILL AURA (JumpKick, sin cooldown fijo, interruptor independiente)
 local PvpKillAuraEnabled = createOption(
     "KILL AURA", "farm strength and attack", 101,
-    {{remote = JumpKick, repetitions = 13}},
+    {{remote = JumpKick, repetitions = 12}},
     0, "PVP_KillAura"
 )
 addToSection("PVP", "KILL AURA", "PVP_KillAura")
