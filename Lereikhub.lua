@@ -51,40 +51,64 @@ end
 
 local INTERVAL = 0
 
--- Solo KILL AURA PVP: comprobar la SafeZone de los enemigos.
--- Bloqueo conservador: si alguno esta dentro (o junto al borde), no atacar.
--- La posicion del jugador local no se comprueba.
--- IMPORTANTE: JumpKick no recibe un objetivo. El servidor debe verificar
--- SafeZone al aplicar dano para garantizar proteccion individual.
-local PVP_SAFE_CHECK_INTERVAL = 0.5
-local PVP_SAFE_MARGIN = 2 -- studs extra para evitar fallos en los bordes
+-- Solo PVP KILL AURA: filtro conservador de SafeZone del lado del cliente.
+-- JumpKick no lleva un objetivo; si un jugador esta protegido o cerca,
+-- se bloquea TODO el envio para no ponerlo en riesgo.
+local PVP_SAFE_MARGIN = 5 -- studs extra en las caras de SafeZone
+local PVP_PREDICT_TIME = 0.4 -- prever entrada de jugadores en movimiento
+local PVP_CLEAR_TIME = 0.6 -- tiempo continuo sin peligro para reanudar
+local pvpClearSince = nil
+
+local function insideSafetyArea(zone, worldPosition)
+    local relative = zone.CFrame:PointToObjectSpace(worldPosition)
+    local half = zone.Size * 0.5
+    return math.abs(relative.X) <= half.X + PVP_SAFE_MARGIN
+        and math.abs(relative.Y) <= half.Y + PVP_SAFE_MARGIN
+        and math.abs(relative.Z) <= half.Z + PVP_SAFE_MARGIN
+end
+
 local function canKillAuraAttack()
     local zone = workspace:FindFirstChild("SafeZone")
     if not zone or not zone:IsA("BasePart") then
+        pvpClearSince = nil
         return false
     end
 
-    local half = zone.Size / 2 + Vector3.new(PVP_SAFE_MARGIN, PVP_SAFE_MARGIN, PVP_SAFE_MARGIN)
-    local hasOutsideEnemy = false
+    local foundLivingEnemy = false
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
             local character = other.Character
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                local root = character:FindFirstChild("HumanoidRootPart")
-                if not root then return false end
-                local relative = zone.CFrame:PointToObjectSpace(root.Position)
-                local protected = math.abs(relative.X) <= half.X
-                    and math.abs(relative.Y) <= half.Y
-                    and math.abs(relative.Z) <= half.Z
-                if protected then
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+
+            -- Sin informacion segura de un jugador: bloquear mientras se actualiza.
+            if not character or not humanoid or not root then
+                pvpClearSince = nil
+                return false
+            end
+            if humanoid.Health > 0 then
+                foundLivingEnemy = true
+                local velocity = root.AssemblyLinearVelocity
+                if insideSafetyArea(zone, root.Position)
+                    or insideSafetyArea(zone, root.Position + velocity * PVP_PREDICT_TIME) then
+                    pvpClearSince = nil
                     return false
                 end
-                hasOutsideEnemy = true
             end
         end
     end
-    return hasOutsideEnemy
+
+    if not foundLivingEnemy then
+        pvpClearSince = nil
+        return false
+    end
+
+    local now = os.clock()
+    if not pvpClearSince then
+        pvpClearSince = now
+        return false
+    end
+    return now - pvpClearSince >= PVP_CLEAR_TIME
 end
 
 -- colors pa que se vea bien
@@ -250,9 +274,6 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
         local currentGeneration = generation
         updateVisual()
 
-        -- Estado exclusivo de PVP; la primera comprobacion es inmediata.
-        local pvpLastCheck = -math.huge
-        local pvpAllowed = false
         task.spawn(function()
             while running
                 and Active
@@ -260,8 +281,10 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                 and ScreenGui.Parent do
 
                 for _, action in ipairs(remoteEvents) do
-                    -- Cada evento se ejecuta dos veces
-                    for i = 1, (action.repetitions or 2) do
+                    -- PVP: una llamada por ciclo, sin rafagas pendientes.
+                    -- El resto conserva exactamente sus repeticiones.
+                    local repeats = saveKey == "PVP_KillAura" and 1 or (action.repetitions or 2)
+                    for i = 1, repeats do
                         if not running
                             or not Active
                             or generation ~= currentGeneration then
@@ -269,18 +292,8 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                         end
 
                         if saveKey == "PVP_KillAura" then
-                            -- Comprobacion programada cada 0.5 segundos.
-                            local now = os.clock()
-                            if now - pvpLastCheck >= PVP_SAFE_CHECK_INTERVAL then
-                                pvpLastCheck = now
-                                pvpAllowed = canKillAuraAttack()
-                            end
-                            -- Revalidar antes del disparo evita usar un estado
-                            -- antiguo durante los 0.5 segundos entre chequeos.
-                            if pvpAllowed and canKillAuraAttack() then
+                            if canKillAuraAttack() then
                                 action.remote:FireServer()
-                            else
-                                pvpAllowed = false
                             end
                         else
                             action.remote:FireServer(
