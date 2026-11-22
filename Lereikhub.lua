@@ -51,35 +51,40 @@ end
 
 local INTERVAL = 0
 
--- Exclusivamente para KILL AURA PVP: detectar si existe al menos
--- un jugador vivo fuera de SafeZone, sin rango y sin revisar al usuario local.
--- IMPORTANTE: este filtro solo habilita el envio de JumpKick; como el
--- RemoteEvent no recibe objetivo, la inmunidad de los jugadores dentro
--- de SafeZone DEBE comprobarse en el servidor que aplica el dano.
+-- Solo KILL AURA PVP: comprobar la SafeZone de los enemigos.
+-- Bloqueo conservador: si alguno esta dentro (o junto al borde), no atacar.
+-- La posicion del jugador local no se comprueba.
+-- IMPORTANTE: JumpKick no recibe un objetivo. El servidor debe verificar
+-- SafeZone al aplicar dano para garantizar proteccion individual.
+local PVP_SAFE_CHECK_INTERVAL = 0.5
+local PVP_SAFE_MARGIN = 2 -- studs extra para evitar fallos en los bordes
 local function canKillAuraAttack()
     local zone = workspace:FindFirstChild("SafeZone")
     if not zone or not zone:IsA("BasePart") then
         return false
     end
 
-    local half = zone.Size / 2
+    local half = zone.Size / 2 + Vector3.new(PVP_SAFE_MARGIN, PVP_SAFE_MARGIN, PVP_SAFE_MARGIN)
+    local hasOutsideEnemy = false
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
             local character = other.Character
-            local root = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            if root and humanoid and humanoid.Health > 0 then
+            if humanoid and humanoid.Health > 0 then
+                local root = character:FindFirstChild("HumanoidRootPart")
+                if not root then return false end
                 local relative = zone.CFrame:PointToObjectSpace(root.Position)
                 local protected = math.abs(relative.X) <= half.X
                     and math.abs(relative.Y) <= half.Y
                     and math.abs(relative.Z) <= half.Z
-                if not protected then
-                    return true
+                if protected then
+                    return false
                 end
+                hasOutsideEnemy = true
             end
         end
     end
-    return false
+    return hasOutsideEnemy
 end
 
 -- colors pa que se vea bien
@@ -245,6 +250,9 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
         local currentGeneration = generation
         updateVisual()
 
+        -- Estado exclusivo de PVP; la primera comprobacion es inmediata.
+        local pvpLastCheck = -math.huge
+        local pvpAllowed = false
         task.spawn(function()
             while running
                 and Active
@@ -261,8 +269,18 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                         end
 
                         if saveKey == "PVP_KillAura" then
-                            if canKillAuraAttack() then
+                            -- Comprobacion programada cada 0.5 segundos.
+                            local now = os.clock()
+                            if now - pvpLastCheck >= PVP_SAFE_CHECK_INTERVAL then
+                                pvpLastCheck = now
+                                pvpAllowed = canKillAuraAttack()
+                            end
+                            -- Revalidar antes del disparo evita usar un estado
+                            -- antiguo durante los 0.5 segundos entre chequeos.
+                            if pvpAllowed and canKillAuraAttack() then
                                 action.remote:FireServer()
+                            else
+                                pvpAllowed = false
                             end
                         else
                             action.remote:FireServer(
