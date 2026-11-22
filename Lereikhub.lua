@@ -56,7 +56,7 @@ local INTERVAL = 0
 -- se bloquea TODO el envio para no ponerlo en riesgo.
 local PVP_SAFE_MARGIN = 5 -- studs extra en las caras de SafeZone
 local PVP_PREDICT_TIME = 0.4 -- prever entrada de jugadores en movimiento
-local PVP_CLEAR_TIME = 0.6 -- tiempo continuo sin peligro para reanudar
+local PVP_CLEAR_TIME = 0.4 -- tiempo continuo sin peligro para reanudar
 local pvpClearSince = nil
 
 local function insideSafetyArea(zone, worldPosition)
@@ -283,7 +283,7 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                 for _, action in ipairs(remoteEvents) do
                     -- PVP: una llamada por ciclo, sin rafagas pendientes.
                     -- El resto conserva exactamente sus repeticiones.
-                    local repeats = saveKey == "PVP_KillAura" and 1 or (action.repetitions or 2)
+                    local repeats = action.repetitions or 2
                     for i = 1, repeats do
                         if not running
                             or not Active
