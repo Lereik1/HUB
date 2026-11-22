@@ -51,6 +51,44 @@ end
 
 local INTERVAL = 0
 
+-- Exclusivamente para los dos KILL AURA: evita activar JumpKick
+-- si no hay otro jugador cercano fuera de SafeZone o hay alguien
+-- protegido cerca. JumpKick no admite un objetivo especifico.
+local KILL_AURA_RANGE = 15
+local function canKillAuraAttack()
+    local zone = workspace:FindFirstChild("SafeZone")
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not zone or not zone:IsA("BasePart") or not root then
+        return false
+    end
+
+    local hasValidTarget = false
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player then
+            local otherCharacter = other.Character
+            local otherRoot = otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart")
+            local humanoid = otherCharacter and otherCharacter:FindFirstChildOfClass("Humanoid")
+            if otherRoot and humanoid and humanoid.Health > 0 then
+                if (otherRoot.Position - root.Position).Magnitude <= KILL_AURA_RANGE then
+                    local localPosition = zone.CFrame:PointToObjectSpace(otherRoot.Position)
+                    local half = zone.Size / 2
+                    local isProtected = math.abs(localPosition.X) <= half.X
+                        and math.abs(localPosition.Y) <= half.Y
+                        and math.abs(localPosition.Z) <= half.Z
+                    -- Como el remoto no selecciona objetivo, no disparar
+                    -- si un jugador protegido esta al alcance del ataque.
+                    if isProtected then
+                        return false
+                    end
+                    hasValidTarget = true
+                end
+            end
+        end
+    end
+    return hasValidTarget
+end
+
 
 -- colors pa que se vea bien
 local BG = Color3.fromRGB(13, 13, 18)
@@ -231,7 +269,9 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                         end
 
                         if saveKey == "Farming_KillAura" or saveKey == "PVP_KillAura" then
-                            action.remote:FireServer()
+                            if canKillAuraAttack() then
+                                action.remote:FireServer()
+                            end
                         else
                             action.remote:FireServer(
                                 table.unpack(action.args or {})
