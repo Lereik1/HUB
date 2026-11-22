@@ -51,61 +51,35 @@ end
 
 local INTERVAL = 0
 
--- Exclusivamente KILL AURA PVP: filtro conservador de SafeZone.
--- Evita activar en el borde, exige estabilidad fuera de zona y no
--- depende de la posicion del jugador local.
--- AVISO: solo el servidor puede garantizar que no haya dano dentro.
-local PVP_SAFE_MARGIN = 3 -- studs adicionales alrededor de la zona
-local PVP_OUTSIDE_STABLE_TIME = 0.25 -- segundos fuera antes de habilitar
-local pvpOutsideSince = nil
-
+-- Exclusivamente para KILL AURA PVP: detectar si existe al menos
+-- un jugador vivo fuera de SafeZone, sin rango y sin revisar al usuario local.
+-- IMPORTANTE: este filtro solo habilita el envio de JumpKick; como el
+-- RemoteEvent no recibe objetivo, la inmunidad de los jugadores dentro
+-- de SafeZone DEBE comprobarse en el servidor que aplica el dano.
 local function canKillAuraAttack()
     local zone = workspace:FindFirstChild("SafeZone")
     if not zone or not zone:IsA("BasePart") then
-        pvpOutsideSince = nil
         return false
     end
 
-    local half = zone.Size * 0.5
-    local hasLivingEnemy = false
-
+    local half = zone.Size / 2
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
             local character = other.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                -- Si la posicion aun no esta replicada, no arriesgar el envio.
-                if not root then
-                    pvpOutsideSince = nil
-                    return false
-                end
-                hasLivingEnemy = true
+            if root and humanoid and humanoid.Health > 0 then
                 local relative = zone.CFrame:PointToObjectSpace(root.Position)
-                local nearOrInside = math.abs(relative.X) <= half.X + PVP_SAFE_MARGIN
-                    and math.abs(relative.Y) <= half.Y + PVP_SAFE_MARGIN
-                    and math.abs(relative.Z) <= half.Z + PVP_SAFE_MARGIN
-                -- JumpKick no recibe ID de victima: evitar disparar si
-                -- cualquier enemigo esta dentro o muy cerca de la zona.
-                if nearOrInside then
-                    pvpOutsideSince = nil
-                    return false
+                local protected = math.abs(relative.X) <= half.X
+                    and math.abs(relative.Y) <= half.Y
+                    and math.abs(relative.Z) <= half.Z
+                if not protected then
+                    return true
                 end
             end
         end
     end
-
-    if not hasLivingEnemy then
-        pvpOutsideSince = nil
-        return false
-    end
-
-    local now = os.clock()
-    if not pvpOutsideSince then
-        pvpOutsideSince = now
-        return false
-    end
-    return (now - pvpOutsideSince) >= PVP_OUTSIDE_STABLE_TIME
+    return false
 end
 
 -- colors pa que se vea bien
@@ -444,7 +418,7 @@ addToSection("PVP", "KILL AURA", "PVP_KillAura")
 
 -- PVP: SPAM SWEEP
 local SpamSweepEnabled = createOption(
-    "SPAM SWEEP", "Test version", 173,
+    "SPAM SWEEP", "Hurts", 173,
     {{remote = Stun, repetitions = 1}},
     0.5, "PVP_SpamSweep"
 )
