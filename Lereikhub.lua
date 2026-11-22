@@ -134,7 +134,6 @@ local Close = createHeaderButton("X", -37, Color3.fromRGB(145, 42, 65))
 
 local running = true
 local controllers = {}
-local lastKillAuraFire = -math.huge -- limite compartido entre Farming y PVP
 
 -- opciones ekisde
 local function createOption(name, note, y, remoteEvents, interval, saveKey)
@@ -232,11 +231,7 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                         end
 
                         if saveKey == "Farming_KillAura" or saveKey == "PVP_KillAura" then
-                            local now = os.clock()
-                            if now - lastKillAuraFire >= (1 / 7) then
-                                lastKillAuraFire = now
-                                action.remote:FireServer()
-                            end
+                            action.remote:FireServer()
                         else
                             action.remote:FireServer(
                                 table.unpack(action.args or {})
@@ -373,19 +368,19 @@ local AutoBenchEnabled = createOption(
 )
 addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
 
--- FARMING: KILL AURA (JumpKick, maximo 7 activaciones/s)
+-- FARMING: KILL AURA (JumpKick, sin cooldown fijo)
 local KillAuraEnabled = createOption(
-    "KILL AURA", "", 245,
+    "KILL AURA", "farm strength", 245,
     {{remote = JumpKick, repetitions = 1}},
-    1 / 7, "Farming_KillAura"
+    0, "Farming_KillAura"
 )
 addToSection("Farming", "KILL AURA", "Farming_KillAura")
 
--- PVP: KILL AURA (mismo limite compartido, interruptor independiente)
+-- PVP: KILL AURA (JumpKick, sin cooldown fijo, interruptor independiente)
 local PvpKillAuraEnabled = createOption(
-    "KILL AURA", "", 101,
-    {{remote = JumpKick, repetitions = 1}},
-    1 / 7, "PVP_KillAura"
+    "KILL AURA", "farm strength", 101,
+    {{remote = JumpKick, repetitions = 10}},
+    0, "PVP_KillAura"
 )
 addToSection("PVP", "KILL AURA", "PVP_KillAura")
 
