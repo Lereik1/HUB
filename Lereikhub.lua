@@ -51,11 +51,10 @@ end
 
 local INTERVAL = 0
 
--- Exclusivamente para KILL AURA PVP: detectar si existe al menos
--- un jugador vivo fuera de SafeZone, sin rango y sin revisar al usuario local.
--- IMPORTANTE: este filtro solo habilita el envio de JumpKick; como el
--- RemoteEvent no recibe objetivo, la inmunidad de los jugadores dentro
--- de SafeZone DEBE comprobarse en el servidor que aplica el dano.
+-- Exclusivamente para KILL AURA PVP: no enviar JumpKick si hay
+-- cualquier jugador vivo dentro de SafeZone. No revisa al usuario local.
+-- Al no recibir un objetivo, JumpKick requiere validacion por victima
+-- en el servidor para permitir atacar afuera sin afectar a los de adentro.
 local function canKillAuraAttack()
     local zone = workspace:FindFirstChild("SafeZone")
     if not zone or not zone:IsA("BasePart") then
@@ -63,6 +62,8 @@ local function canKillAuraAttack()
     end
 
     local half = zone.Size / 2
+    local hasEnemyOutside = false
+
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
             local character = other.Character
@@ -73,13 +74,17 @@ local function canKillAuraAttack()
                 local protected = math.abs(relative.X) <= half.X
                     and math.abs(relative.Y) <= half.Y
                     and math.abs(relative.Z) <= half.Z
-                if not protected then
-                    return true
+
+                -- JumpKick no acepta un objetivo: no se puede filtrar por victima
+                -- desde este cliente. Si hay alguien protegido, NO se envia.
+                if protected then
+                    return false
                 end
+                hasEnemyOutside = true
             end
         end
     end
-    return false
+    return hasEnemyOutside
 end
 
 -- colors pa que se vea bien
@@ -418,7 +423,7 @@ addToSection("PVP", "KILL AURA", "PVP_KillAura")
 
 -- PVP: SPAM SWEEP
 local SpamSweepEnabled = createOption(
-    "SPAM SWEEP", "Hurts", 173,
+    "SPAM SWEEP", "hurts", 173,
     {{remote = Stun, repetitions = 1}},
     0.5, "PVP_SpamSweep"
 )
