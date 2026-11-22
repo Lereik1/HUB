@@ -54,9 +54,9 @@ local INTERVAL = 0
 -- Solo PVP KILL AURA: filtro conservador de SafeZone del lado del cliente.
 -- JumpKick no lleva un objetivo; si un jugador esta protegido o cerca,
 -- se bloquea TODO el envio para no ponerlo en riesgo.
-local PVP_SAFE_MARGIN = 1 -- studs extra en las caras de SafeZone
-local PVP_PREDICT_TIME = 0.1 -- prever entrada de jugadores en movimiento
-local PVP_CLEAR_TIME = 0.1 -- tiempo continuo sin peligro para reanudar
+local PVP_SAFE_MARGIN = 5 -- studs extra en las caras de SafeZone
+local PVP_PREDICT_TIME = 0.4 -- prever entrada de jugadores en movimiento
+local PVP_CLEAR_TIME = 0.4 -- tiempo continuo sin peligro para reanudar
 local pvpClearSince = nil
 
 local function insideSafetyArea(zone, worldPosition)
@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.4"
+Version.Text = "v1.3"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -434,7 +434,7 @@ addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
 -- FARMING: KILL AURA (JumpKick, sin cooldown fijo)
 local KillAuraEnabled = createOption(
     "KILL AURA", "farm strength and attack", 245,
-    {{remote = JumpKick, repetitions = 12}},
+    {{remote = JumpKick, repetitions = 11}},
     0, "Farming_KillAura"
 )
 addToSection("Farming", "KILL AURA", "Farming_KillAura")
@@ -442,7 +442,7 @@ addToSection("Farming", "KILL AURA", "Farming_KillAura")
 -- PVP: KILL AURA (JumpKick, sin cooldown fijo, interruptor independiente)
 local PvpKillAuraEnabled = createOption(
     "KILL AURA", "farm strength and attack", 101,
-    {{remote = JumpKick, repetitions = 12}},
+    {{remote = JumpKick, repetitions = 11}},
     0, "PVP_KillAura"
 )
 addToSection("PVP", "KILL AURA", "PVP_KillAura")
