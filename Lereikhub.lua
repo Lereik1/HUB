@@ -134,6 +134,7 @@ local Close = createHeaderButton("X", -37, Color3.fromRGB(145, 42, 65))
 
 local running = true
 local controllers = {}
+local lastKillAuraFire = -math.huge -- limite compartido entre Farming y PVP
 
 -- opciones ekisde
 local function createOption(name, note, y, remoteEvents, interval, saveKey)
@@ -230,9 +231,17 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                             break
                         end
 
-                        action.remote:FireServer(
-                            table.unpack(action.args or {})
-                        )
+                        if saveKey == "Farming_KillAura" or saveKey == "PVP_KillAura" then
+                            local now = os.clock()
+                            if now - lastKillAuraFire >= (1 / 7) then
+                                lastKillAuraFire = now
+                                action.remote:FireServer()
+                            end
+                        else
+                            action.remote:FireServer(
+                                table.unpack(action.args or {})
+                            )
+                        end
                     end
 
                     if not running or not Active then
@@ -364,27 +373,19 @@ local AutoBenchEnabled = createOption(
 )
 addToSection("Farming", "AUTO BENCH", "Farming_AutoBench")
 
--- FARMING: KILL AURA
+-- FARMING: KILL AURA (JumpKick, maximo 7 activaciones/s)
 local KillAuraEnabled = createOption(
-    "KILL AURA", "Strength farm", 245,
-    {
-        {remote = JumpKick},
-        {remote = HandKick},
-        {remote = JumpKick, args = {2}},
-        {remote = DoubleReg}
-    }, nil, "Farming_KillAura"
+    "KILL AURA", "", 245,
+    {{remote = JumpKick, repetitions = 1}},
+    1 / 7, "Farming_KillAura"
 )
 addToSection("Farming", "KILL AURA", "Farming_KillAura")
 
--- PVP: KILL AURA (mismos eventos; interruptor independiente)
+-- PVP: KILL AURA (mismo limite compartido, interruptor independiente)
 local PvpKillAuraEnabled = createOption(
-    "KILL AURA", "Strength farm", 101,
-    {
-        {remote = JumpKick},
-        {remote = HandKick},
-        {remote = JumpKick, args = {2}},
-        {remote = DoubleReg}
-    }, nil, "PVP_KillAura"
+    "KILL AURA", "", 101,
+    {{remote = JumpKick, repetitions = 1}},
+    1 / 7, "PVP_KillAura"
 )
 addToSection("PVP", "KILL AURA", "PVP_KillAura")
 
