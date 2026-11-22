@@ -51,40 +51,61 @@ end
 
 local INTERVAL = 0
 
--- Exclusivamente para KILL AURA PVP: no enviar JumpKick si hay
--- cualquier jugador vivo dentro de SafeZone. No revisa al usuario local.
--- Al no recibir un objetivo, JumpKick requiere validacion por victima
--- en el servidor para permitir atacar afuera sin afectar a los de adentro.
+-- Exclusivamente KILL AURA PVP: filtro conservador de SafeZone.
+-- Evita activar en el borde, exige estabilidad fuera de zona y no
+-- depende de la posicion del jugador local.
+-- AVISO: solo el servidor puede garantizar que no haya dano dentro.
+local PVP_SAFE_MARGIN = 3 -- studs adicionales alrededor de la zona
+local PVP_OUTSIDE_STABLE_TIME = 0.25 -- segundos fuera antes de habilitar
+local pvpOutsideSince = nil
+
 local function canKillAuraAttack()
     local zone = workspace:FindFirstChild("SafeZone")
     if not zone or not zone:IsA("BasePart") then
+        pvpOutsideSince = nil
         return false
     end
 
-    local half = zone.Size / 2
-    local hasEnemyOutside = false
+    local half = zone.Size * 0.5
+    local hasLivingEnemy = false
 
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
             local character = other.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            if root and humanoid and humanoid.Health > 0 then
-                local relative = zone.CFrame:PointToObjectSpace(root.Position)
-                local protected = math.abs(relative.X) <= half.X
-                    and math.abs(relative.Y) <= half.Y
-                    and math.abs(relative.Z) <= half.Z
-
-                -- JumpKick no acepta un objetivo: no se puede filtrar por victima
-                -- desde este cliente. Si hay alguien protegido, NO se envia.
-                if protected then
+            if humanoid and humanoid.Health > 0 then
+                -- Si la posicion aun no esta replicada, no arriesgar el envio.
+                if not root then
+                    pvpOutsideSince = nil
                     return false
                 end
-                hasEnemyOutside = true
+                hasLivingEnemy = true
+                local relative = zone.CFrame:PointToObjectSpace(root.Position)
+                local nearOrInside = math.abs(relative.X) <= half.X + PVP_SAFE_MARGIN
+                    and math.abs(relative.Y) <= half.Y + PVP_SAFE_MARGIN
+                    and math.abs(relative.Z) <= half.Z + PVP_SAFE_MARGIN
+                -- JumpKick no recibe ID de victima: evitar disparar si
+                -- cualquier enemigo esta dentro o muy cerca de la zona.
+                if nearOrInside then
+                    pvpOutsideSince = nil
+                    return false
+                end
             end
         end
     end
-    return hasEnemyOutside
+
+    if not hasLivingEnemy then
+        pvpOutsideSince = nil
+        return false
+    end
+
+    local now = os.clock()
+    if not pvpOutsideSince then
+        pvpOutsideSince = now
+        return false
+    end
+    return (now - pvpOutsideSince) >= PVP_OUTSIDE_STABLE_TIME
 end
 
 -- colors pa que se vea bien
@@ -423,7 +444,7 @@ addToSection("PVP", "KILL AURA", "PVP_KillAura")
 
 -- PVP: SPAM SWEEP
 local SpamSweepEnabled = createOption(
-    "SPAM SWEEP", "hurts", 173,
+    "SPAM SWEEP", "Test version", 173,
     {{remote = Stun, repetitions = 1}},
     0.5, "PVP_SpamSweep"
 )
