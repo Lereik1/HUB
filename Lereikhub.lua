@@ -54,7 +54,7 @@ local INTERVAL = 0
 -- Solo PVP KILL AURA: filtro conservador de SafeZone del lado del cliente.
 -- JumpKick no lleva un objetivo; si un jugador esta protegido o cerca,
 -- se bloquea TODO el envio para no ponerlo en riesgo.
-local PVP_SAFE_MARGIN = 5 -- studs extra en las caras de SafeZone
+local PVP_SAFE_MARGIN = 1 -- studs extra en las caras de SafeZone
 local PVP_PREDICT_TIME = 0.4 -- prever entrada de jugadores en movimiento
 local PVP_CLEAR_TIME = 0.4 -- tiempo continuo sin peligro para reanudar
 local pvpClearSince = nil
@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.3"
+Version.Text = "v1.4"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
