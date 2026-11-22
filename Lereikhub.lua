@@ -51,18 +51,17 @@ end
 
 local INTERVAL = 0
 
--- Exclusivamente para KILL AURA PVP: evita activar JumpKick
--- si no hay otro jugador cercano fuera de SafeZone o hay alguien
--- protegido cerca. JumpKick no admite un objetivo especifico.
-local KILL_AURA_RANGE = 15
+-- Exclusivamente para KILL AURA PVP: comprobar la SafeZone de
+-- los otros jugadores, sin distancia maxima ni revisar al jugador local.
+-- JumpKick no admite un objetivo especifico: para evitar atacar a
+-- jugadores protegidos, se pausa si cualquiera esta dentro de SafeZone.
 local function canKillAuraAttack()
     local zone = workspace:FindFirstChild("SafeZone")
-    local character = player.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not zone or not zone:IsA("BasePart") or not root then
+    if not zone or not zone:IsA("BasePart") then
         return false
     end
 
+    local half = zone.Size / 2
     local hasValidTarget = false
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
@@ -70,25 +69,19 @@ local function canKillAuraAttack()
             local otherRoot = otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart")
             local humanoid = otherCharacter and otherCharacter:FindFirstChildOfClass("Humanoid")
             if otherRoot and humanoid and humanoid.Health > 0 then
-                if (otherRoot.Position - root.Position).Magnitude <= KILL_AURA_RANGE then
-                    local localPosition = zone.CFrame:PointToObjectSpace(otherRoot.Position)
-                    local half = zone.Size / 2
-                    local isProtected = math.abs(localPosition.X) <= half.X
-                        and math.abs(localPosition.Y) <= half.Y
-                        and math.abs(localPosition.Z) <= half.Z
-                    -- Como el remoto no selecciona objetivo, no disparar
-                    -- si un jugador protegido esta al alcance del ataque.
-                    if isProtected then
-                        return false
-                    end
-                    hasValidTarget = true
+                local localPosition = zone.CFrame:PointToObjectSpace(otherRoot.Position)
+                local isProtected = math.abs(localPosition.X) <= half.X
+                    and math.abs(localPosition.Y) <= half.Y
+                    and math.abs(localPosition.Z) <= half.Z
+                if isProtected then
+                    return false
                 end
+                hasValidTarget = true
             end
         end
     end
     return hasValidTarget
 end
-
 
 -- colors pa que se vea bien
 local BG = Color3.fromRGB(13, 13, 18)
@@ -426,7 +419,7 @@ addToSection("PVP", "KILL AURA", "PVP_KillAura")
 
 -- PVP: SPAM SWEEP
 local SpamSweepEnabled = createOption(
-    "SPAM SWEEP", "Test version", 173,
+    "SPAM SWEEP", "hurts enemies", 173,
     {{remote = Stun, repetitions = 1}},
     0.5, "PVP_SpamSweep"
 )
