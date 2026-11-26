@@ -54,17 +54,18 @@ local INTERVAL = 0
 -- Solo PVP KILL AURA: filtro conservador de SafeZone del lado del cliente.
 -- JumpKick no lleva un objetivo; si un jugador esta protegido o cerca,
 -- se bloquea TODO el envio para no ponerlo en riesgo.
-local PVP_SAFE_MARGIN = 1 -- studs extra en las caras de SafeZone
-local PVP_PREDICT_TIME = 0.3 -- prever entrada de jugadores en movimiento
+local PVP_SAFE_MARGIN = 5 -- studs extra en las caras de SafeZone
+local PVP_PREDICT_TIME = 0.4 -- prever entrada de jugadores en movimiento
 local PVP_CLEAR_TIME = 0.4 -- tiempo continuo sin peligro para reanudar
 local pvpClearSince = nil
 
-local function insideSafetyArea(zone, worldPosition)
-    local relative = zone.CFrame:PointToObjectSpace(worldPosition)
-    local half = zone.Size * 0.5
-    return math.abs(relative.X) <= half.X + PVP_SAFE_MARGIN
-        and math.abs(relative.Y) <= half.Y + PVP_SAFE_MARGIN
-        and math.abs(relative.Z) <= half.Z + PVP_SAFE_MARGIN
+-- Calcular la geometria de la zona una sola vez por comprobacion,
+-- sin cambiar el margen ni la deteccion de movimiento.
+local function insideSafetyArea(zoneCFrame, bounds, worldPosition)
+    local relative = zoneCFrame:PointToObjectSpace(worldPosition)
+    return math.abs(relative.X) <= bounds.X
+        and math.abs(relative.Y) <= bounds.Y
+        and math.abs(relative.Z) <= bounds.Z
 end
 
 local function canKillAuraAttack()
@@ -74,6 +75,10 @@ local function canKillAuraAttack()
         return false
     end
 
+    -- Datos compartidos por todas las comprobaciones de esta ejecucion.
+    -- Se recalculan en la siguiente ejecucion para detectar cambios de SafeZone.
+    local zoneCFrame = zone.CFrame
+    local bounds = zone.Size * 0.5 + Vector3.new(PVP_SAFE_MARGIN, PVP_SAFE_MARGIN, PVP_SAFE_MARGIN)
     local foundLivingEnemy = false
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
@@ -89,8 +94,9 @@ local function canKillAuraAttack()
             if humanoid.Health > 0 then
                 foundLivingEnemy = true
                 local velocity = root.AssemblyLinearVelocity
-                if insideSafetyArea(zone, root.Position)
-                    or insideSafetyArea(zone, root.Position + velocity * PVP_PREDICT_TIME) then
+                local currentPosition = root.Position
+                if insideSafetyArea(zoneCFrame, bounds, currentPosition)
+                    or insideSafetyArea(zoneCFrame, bounds, currentPosition + velocity * PVP_PREDICT_TIME) then
                     pvpClearSince = nil
                     return false
                 end
@@ -167,7 +173,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v2.0"
+Version.Text = "v1.3"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -281,8 +287,7 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                 and ScreenGui.Parent do
 
                 for _, action in ipairs(remoteEvents) do
-                    -- PVP: una llamada por ciclo, sin rafagas pendientes.
-                    -- El resto conserva exactamente sus repeticiones.
+                    -- Conservar la cantidad exacta de repeticiones (11 en ambos Kill Aura).
                     local repeats = action.repetitions or 2
                     for i = 1, repeats do
                         if not running
@@ -296,9 +301,13 @@ local function createOption(name, note, y, remoteEvents, interval, saveKey)
                                 action.remote:FireServer()
                             end
                         else
-                            action.remote:FireServer(
-                                table.unpack(action.args or {})
-                            )
+                            -- Evita crear una tabla vacia nueva en cada ejecucion.
+                            -- FireServer() conserva los mismos argumentos originales.
+                            if action.args then
+                                action.remote:FireServer(table.unpack(action.args))
+                            else
+                                action.remote:FireServer()
+                            end
                         end
                     end
 
