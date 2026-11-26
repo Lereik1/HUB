@@ -55,8 +55,8 @@ local INTERVAL = 0
 -- JumpKick no lleva un objetivo; si un jugador esta protegido o cerca,
 -- se bloquea TODO el envio para no ponerlo en riesgo.
 local PVP_SAFE_MARGIN = 1 -- studs extra en las caras de SafeZone
-local PVP_PREDICT_TIME = 0.1 -- prever entrada de jugadores en movimiento
-local PVP_CLEAR_TIME = 0.1 -- tiempo continuo sin peligro para reanudar
+local PVP_PREDICT_TIME = 0.3 -- prever entrada de jugadores en movimiento
+local PVP_CLEAR_TIME = 0.4 -- tiempo continuo sin peligro para reanudar
 local pvpClearSince = nil
 
 local function insideSafetyArea(zone, worldPosition)
