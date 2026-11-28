@@ -1406,8 +1406,10 @@ local function joinTargetPlayer()
             -- Si falta, obtenerlo a partir del PlaceId con la API de Universes.
             -- game.GameId es el UniverseId de la experiencia actual.
             local targetPlaceId = tonumber(presence.placeId)
+                or tonumber(presence.rootPlaceId)
+
             if not targetPlaceId then
-                error("Roblox no devolvio el PlaceId del servidor del jugador")
+                error("Roblox no devolvio el PlaceId ni el RootPlaceId del jugador")
             end
 
             local targetUniverseId = tonumber(presence.universeId)
