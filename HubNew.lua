@@ -1249,6 +1249,207 @@ AFKToggle.MouseButton1Click:Connect(toggleAntiAFK)
 if saved.toggles.Utilities_AntiAFK == true then task.defer(toggleAntiAFK) end
 
 table.insert(controllers, stopAntiAFK)
+
+-- UTILITIES: JOIN PLAYER (solo dentro del mismo juego/PlaceId)
+-- Busca el servidor actual del usuario mediante la API de presencia de Roblox.
+local JoinOption = Instance.new("Frame")
+JoinOption.Name = "Utilities_JoinPlayer"
+JoinOption.Size = UDim2.new(1, -26, 0, 132)
+JoinOption.Position = UDim2.new(0, 13, 0, 173)
+JoinOption.BackgroundColor3 = PANEL
+JoinOption.BorderSizePixel = 0
+JoinOption.Parent = Main
+table.insert(sections.Utilities, JoinOption)
+
+local JoinIndicator = Instance.new("Frame")
+JoinIndicator.Size = UDim2.new(0, 3, 1, 0)
+JoinIndicator.BackgroundColor3 = OFF
+JoinIndicator.BorderSizePixel = 0
+JoinIndicator.Parent = JoinOption
+
+local JoinLabel = Instance.new("TextLabel")
+JoinLabel.Size = UDim2.new(1, -24, 0, 22)
+JoinLabel.Position = UDim2.new(0, 12, 0, 7)
+JoinLabel.BackgroundTransparency = 1
+JoinLabel.Text = "JOIN PLAYER"
+JoinLabel.TextColor3 = TEXT
+JoinLabel.Font = Enum.Font.GothamBold
+JoinLabel.TextSize = 13
+JoinLabel.TextXAlignment = Enum.TextXAlignment.Left
+JoinLabel.Parent = JoinOption
+
+local JoinNote = Instance.new("TextLabel")
+JoinNote.Size = UDim2.new(1, -24, 0, 17)
+JoinNote.Position = UDim2.new(0, 12, 0, 28)
+JoinNote.BackgroundTransparency = 1
+JoinNote.Text = "Unirse a su servidor en este mismo juego"
+JoinNote.TextColor3 = MUTED
+JoinNote.Font = Enum.Font.Code
+JoinNote.TextSize = 10
+JoinNote.TextXAlignment = Enum.TextXAlignment.Left
+JoinNote.Parent = JoinOption
+
+local JoinName = Instance.new("TextBox")
+JoinName.Size = UDim2.new(1, -24, 0, 29)
+JoinName.Position = UDim2.new(0, 12, 0, 51)
+JoinName.BackgroundColor3 = BG
+JoinName.BorderSizePixel = 0
+JoinName.PlaceholderText = "Username exacto del jugador"
+JoinName.PlaceholderColor3 = MUTED
+JoinName.Text = ""
+JoinName.TextColor3 = TEXT
+JoinName.Font = Enum.Font.GothamMedium
+JoinName.TextSize = 11
+JoinName.TextXAlignment = Enum.TextXAlignment.Left
+JoinName.ClearTextOnFocus = false
+JoinName.Parent = JoinOption
+
+local JoinPadding = Instance.new("UIPadding")
+JoinPadding.PaddingLeft = UDim.new(0, 7)
+JoinPadding.PaddingRight = UDim.new(0, 7)
+JoinPadding.Parent = JoinName
+
+local JoinButton = Instance.new("TextButton")
+JoinButton.Size = UDim2.new(0, 92, 0, 27)
+JoinButton.Position = UDim2.new(1, -104, 0, 87)
+JoinButton.BackgroundColor3 = PURPLE
+JoinButton.BorderSizePixel = 0
+JoinButton.Text = "UNIRME"
+JoinButton.TextColor3 = TEXT
+JoinButton.Font = Enum.Font.GothamBold
+JoinButton.TextSize = 11
+JoinButton.Parent = JoinOption
+
+local JoinStatus = Instance.new("TextLabel")
+JoinStatus.Size = UDim2.new(1, -112, 0, 30)
+JoinStatus.Position = UDim2.new(0, 12, 0, 86)
+JoinStatus.BackgroundTransparency = 1
+JoinStatus.Text = "Escribe el username del objetivo"
+JoinStatus.TextColor3 = MUTED
+JoinStatus.Font = Enum.Font.Code
+JoinStatus.TextSize = 9
+JoinStatus.TextWrapped = true
+JoinStatus.TextXAlignment = Enum.TextXAlignment.Left
+JoinStatus.Parent = JoinOption
+
+local joinBusy = false
+
+local function getExecutorRequest()
+    if type(request) == "function" then return request end
+    if type(http_request) == "function" then return http_request end
+    if syn and type(syn.request) == "function" then return syn.request end
+    return nil
+end
+
+local function joinTargetPlayer()
+    if joinBusy or not running then return end
+
+    local username = JoinName.Text:gsub("^%s+", ""):gsub("%s+$", "")
+    if username == "" then
+        JoinStatus.Text = "Escribe un username"
+        return
+    end
+
+    local httpRequest = getExecutorRequest()
+    if not httpRequest then
+        JoinStatus.Text = "Tu ejecutor no admite solicitudes HTTP"
+        return
+    end
+
+    joinBusy = true
+    JoinButton.Text = "BUSCANDO"
+    JoinButton.BackgroundColor3 = OFF
+    JoinStatus.Text = "Consultando jugador..."
+
+    task.spawn(function()
+        local ok, result = pcall(function()
+            -- Resolver el username a UserId.
+            local userResponse = httpRequest({
+                Url = "https://users.roblox.com/v1/usernames/users",
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode({
+                    usernames = { username },
+                    excludeBannedUsers = true
+                })
+            })
+
+            if not userResponse or userResponse.StatusCode < 200 or userResponse.StatusCode >= 300 then
+                error("No se pudo encontrar el usuario")
+            end
+
+            local userData = HttpService:JSONDecode(userResponse.Body)
+            local userInfo = userData.data and userData.data[1]
+            if not userInfo or not userInfo.id then
+                error("Username no encontrado")
+            end
+
+            -- Consultar presencia para obtener el JobId del servidor.
+            local presenceResponse = httpRequest({
+                Url = "https://presence.roblox.com/v1/presence/users",
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode({ userIds = { userInfo.id } })
+            })
+
+            if not presenceResponse or presenceResponse.StatusCode < 200 or presenceResponse.StatusCode >= 300 then
+                error("No se pudo consultar su presencia")
+            end
+
+            local presenceData = HttpService:JSONDecode(presenceResponse.Body)
+            local presence = presenceData.userPresences and presenceData.userPresences[1]
+            if not presence or presence.userPresenceType ~= 2 then
+                error("El jugador no esta en un servidor de juego")
+            end
+
+            -- Bloqueo estricto: nunca intentar unirse si el PlaceId es distinto.
+            if tonumber(presence.placeId) ~= game.PlaceId then
+                error("El jugador esta en otro juego; solo se permite este mismo juego")
+            end
+
+            local targetJobId = presence.gameId
+            if type(targetJobId) ~= "string" or targetJobId == "" then
+                error("Roblox no devolvio el servidor del jugador")
+            end
+
+            if targetJobId == game.JobId then
+                error("Ya estas en el mismo servidor que ese jugador")
+            end
+
+            return {
+                userName = userInfo.name,
+                jobId = targetJobId
+            }
+        end)
+
+        if not ok then
+            JoinStatus.Text = tostring(result)
+            joinBusy = false
+            JoinButton.Text = "UNIRME"
+            JoinButton.BackgroundColor3 = PURPLE
+            return
+        end
+
+        JoinStatus.Text = "Conectando con " .. result.userName .. "..."
+        local teleportOk, teleportError = pcall(function()
+            game:GetService("TeleportService"):TeleportToPlaceInstance(
+                game.PlaceId,
+                result.jobId,
+                player
+            )
+        end)
+
+        if not teleportOk then
+            JoinStatus.Text = "No se pudo iniciar el teleport: " .. tostring(teleportError)
+            joinBusy = false
+            JoinButton.Text = "UNIRME"
+            JoinButton.BackgroundColor3 = PURPLE
+        end
+    end)
+end
+
+JoinButton.MouseButton1Click:Connect(joinTargetPlayer)
+
 showSection(saved.lastTab)
 
 -- boton chido
