@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.4"
+Version.Text = "v1.3"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -1402,21 +1402,37 @@ local function joinTargetPlayer()
                 error("El jugador no esta en un servidor de juego")
             end
 
-            -- Permitir cualquier Place que pertenezca a la misma experiencia.
+            -- La API de presencia no siempre incluye universeId.
+            -- Si falta, obtenerlo a partir del PlaceId con la API de Universes.
             -- game.GameId es el UniverseId de la experiencia actual.
-            local targetUniverseId = tonumber(presence.universeId)
             local targetPlaceId = tonumber(presence.placeId)
+            if not targetPlaceId then
+                error("Roblox no devolvio el PlaceId del servidor del jugador")
+            end
+
+            local targetUniverseId = tonumber(presence.universeId)
+            if not targetUniverseId then
+                local universeResponse = httpRequest({
+                    Url = "https://apis.roblox.com/universes/v1/places/" .. tostring(targetPlaceId) .. "/universe",
+                    Method = "GET",
+                    Headers = { ["Accept"] = "application/json" }
+                })
+
+                local universeStatus = universeResponse and tonumber(universeResponse.StatusCode)
+                if not universeResponse or not universeStatus or universeStatus < 200 or universeStatus >= 300 then
+                    error("No se pudo obtener el UniverseId a partir del PlaceId")
+                end
+
+                local universeData = HttpService:JSONDecode(universeResponse.Body)
+                targetUniverseId = tonumber(universeData and (universeData.universeId or universeData.UniverseId))
+            end
 
             if not targetUniverseId then
-                error("Roblox no devolvio el UniverseId del jugador; no se puede verificar que sea la misma experiencia")
+                error("La API de Roblox no devolvio el UniverseId de ese Place")
             end
 
             if targetUniverseId ~= game.GameId then
                 error("El jugador esta en otra experiencia; solo se permite este mismo juego")
-            end
-
-            if not targetPlaceId then
-                error("Roblox no devolvio el PlaceId del servidor del jugador")
             end
 
             local targetJobId = presence.gameId
