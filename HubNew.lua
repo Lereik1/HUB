@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.3"
+Version.Text = "v1.9"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -1321,15 +1321,16 @@ JoinButton.TextSize = 11
 JoinButton.Parent = JoinOption
 
 local JoinStatus = Instance.new("TextLabel")
-JoinStatus.Size = UDim2.new(1, -112, 0, 30)
-JoinStatus.Position = UDim2.new(0, 12, 0, 86)
+JoinStatus.Size = UDim2.new(1, -112, 0, 42)
+JoinStatus.Position = UDim2.new(0, 12, 0, 85)
 JoinStatus.BackgroundTransparency = 1
 JoinStatus.Text = "Escribe el username del objetivo"
 JoinStatus.TextColor3 = MUTED
 JoinStatus.Font = Enum.Font.Code
-JoinStatus.TextSize = 9
+JoinStatus.TextSize = 8
 JoinStatus.TextWrapped = true
 JoinStatus.TextXAlignment = Enum.TextXAlignment.Left
+JoinStatus.TextYAlignment = Enum.TextYAlignment.Center
 JoinStatus.Parent = JoinOption
 
 local joinBusy = false
@@ -1480,11 +1481,7 @@ local function joinTargetPlayer()
             -- Si Roblox no proporciona gameId, no existe una forma publica de saber
             -- que servidor contiene a ese usuario. Enumerar servidores no revela sus ocupantes.
             if not targetJobId then
-                error(
-                    "Roblox confirma que " .. tostring(userInfo.name) .. " esta jugando, pero no entrego el ID de su servidor (gameId). " ..
-                    "PlaceId=" .. tostring(targetPlaceId) .. ", RootPlaceId=" .. tostring(rootPlaceId) ..
-                    ", UniverseId=" .. tostring(targetUniverseId) .. ". No se puede identificar su instancia publica sin ese dato."
-                )
+                error("Roblox detecto al jugador, pero no proporciono el ID de su servidor. No se puede teletransportar sin ese dato.")
             end
 
             -- Si Presence omitio el PlaceId exacto, buscar en los Places del mismo Universe
@@ -1553,7 +1550,10 @@ local function joinTargetPlayer()
         end)
 
         if not ok then
-            JoinStatus.Text = tostring(result)
+            local cleanError = tostring(result)
+            cleanError = cleanError:gsub("^.-:%d+:%s*", "")
+            cleanError = cleanError:gsub("\r", " "):gsub("\n.*$", "")
+            JoinStatus.Text = cleanError
             joinBusy = false
             JoinButton.Text = "UNIRME"
             JoinButton.BackgroundColor3 = PURPLE
