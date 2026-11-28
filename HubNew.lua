@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.9"
+Version.Text = "v1.3"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -1250,8 +1250,7 @@ if saved.toggles.Utilities_AntiAFK == true then task.defer(toggleAntiAFK) end
 
 table.insert(controllers, stopAntiAFK)
 
--- UTILITIES: JOIN PLAYER (permite otros Places dentro de la misma experiencia/Universe)
--- Busca el servidor actual del usuario mediante la API de presencia de Roblox.
+-- UTILITIES: SERVER HOP (cambia a otro servidor publico de esta experiencia)
 local JoinOption = Instance.new("Frame")
 JoinOption.Name = "Utilities_JoinPlayer"
 JoinOption.Size = UDim2.new(1, -26, 0, 132)
@@ -1271,7 +1270,7 @@ local JoinLabel = Instance.new("TextLabel")
 JoinLabel.Size = UDim2.new(1, -24, 0, 22)
 JoinLabel.Position = UDim2.new(0, 12, 0, 7)
 JoinLabel.BackgroundTransparency = 1
-JoinLabel.Text = "JOIN PLAYER"
+JoinLabel.Text = "SERVER HOP"
 JoinLabel.TextColor3 = TEXT
 JoinLabel.Font = Enum.Font.GothamBold
 JoinLabel.TextSize = 13
@@ -1279,42 +1278,23 @@ JoinLabel.TextXAlignment = Enum.TextXAlignment.Left
 JoinLabel.Parent = JoinOption
 
 local JoinNote = Instance.new("TextLabel")
-JoinNote.Size = UDim2.new(1, -24, 0, 17)
-JoinNote.Position = UDim2.new(0, 12, 0, 28)
+JoinNote.Size = UDim2.new(1, -24, 0, 30)
+JoinNote.Position = UDim2.new(0, 12, 0, 31)
 JoinNote.BackgroundTransparency = 1
-JoinNote.Text = "Unirse a su servidor en este mismo juego"
+JoinNote.Text = "Cambiar a otro servidor publico de este juego"
 JoinNote.TextColor3 = MUTED
 JoinNote.Font = Enum.Font.Code
 JoinNote.TextSize = 10
+JoinNote.TextWrapped = true
 JoinNote.TextXAlignment = Enum.TextXAlignment.Left
 JoinNote.Parent = JoinOption
-
-local JoinName = Instance.new("TextBox")
-JoinName.Size = UDim2.new(1, -24, 0, 29)
-JoinName.Position = UDim2.new(0, 12, 0, 51)
-JoinName.BackgroundColor3 = BG
-JoinName.BorderSizePixel = 0
-JoinName.PlaceholderText = "Username exacto del jugador"
-JoinName.PlaceholderColor3 = MUTED
-JoinName.Text = ""
-JoinName.TextColor3 = TEXT
-JoinName.Font = Enum.Font.GothamMedium
-JoinName.TextSize = 11
-JoinName.TextXAlignment = Enum.TextXAlignment.Left
-JoinName.ClearTextOnFocus = false
-JoinName.Parent = JoinOption
-
-local JoinPadding = Instance.new("UIPadding")
-JoinPadding.PaddingLeft = UDim.new(0, 7)
-JoinPadding.PaddingRight = UDim.new(0, 7)
-JoinPadding.Parent = JoinName
 
 local JoinButton = Instance.new("TextButton")
 JoinButton.Size = UDim2.new(0, 92, 0, 27)
 JoinButton.Position = UDim2.new(1, -104, 0, 87)
 JoinButton.BackgroundColor3 = PURPLE
 JoinButton.BorderSizePixel = 0
-JoinButton.Text = "UNIRME"
+JoinButton.Text = "CAMBIAR"
 JoinButton.TextColor3 = TEXT
 JoinButton.Font = Enum.Font.GothamBold
 JoinButton.TextSize = 11
@@ -1322,18 +1302,19 @@ JoinButton.Parent = JoinOption
 
 local JoinStatus = Instance.new("TextLabel")
 JoinStatus.Size = UDim2.new(1, -112, 0, 42)
-JoinStatus.Position = UDim2.new(0, 12, 0, 85)
+JoinStatus.Position = UDim2.new(0, 12, 0, 82)
 JoinStatus.BackgroundTransparency = 1
-JoinStatus.Text = "Escribe el username del objetivo"
+JoinStatus.Text = "Pulsa CAMBIAR para buscar otra instancia"
 JoinStatus.TextColor3 = MUTED
 JoinStatus.Font = Enum.Font.Code
-JoinStatus.TextSize = 8
+JoinStatus.TextSize = 9
 JoinStatus.TextWrapped = true
 JoinStatus.TextXAlignment = Enum.TextXAlignment.Left
 JoinStatus.TextYAlignment = Enum.TextYAlignment.Center
 JoinStatus.Parent = JoinOption
 
 local joinBusy = false
+local visitedServers = {}
 
 local function getExecutorRequest()
     if type(request) == "function" then return request end
@@ -1345,12 +1326,6 @@ end
 local function joinTargetPlayer()
     if joinBusy or not running then return end
 
-    local username = JoinName.Text:gsub("^%s+", ""):gsub("%s+$", "")
-    if username == "" then
-        JoinStatus.Text = "Escribe un username"
-        return
-    end
-
     local httpRequest = getExecutorRequest()
     if not httpRequest then
         JoinStatus.Text = "Tu ejecutor no admite solicitudes HTTP"
@@ -1360,221 +1335,93 @@ local function joinTargetPlayer()
     joinBusy = true
     JoinButton.Text = "BUSCANDO"
     JoinButton.BackgroundColor3 = OFF
-    JoinStatus.Text = "Consultando jugador..."
+    JoinStatus.Text = "Buscando servidores publicos..."
 
     task.spawn(function()
-        local ok, result = pcall(function()
-            local function sendRequest(url, method, body)
+        local teleportService = game:GetService("TeleportService")
+        local placeId = game.PlaceId
+        local currentJobId = game.JobId
+        local candidates = {}
+        local cursor = nil
+        local requestOk, requestError = pcall(function()
+            for page = 1, 4 do
+                local url = "https://games.roblox.com/v1/games/" .. tostring(placeId) .. "/servers/Public?limit=100&sortOrder=Asc"
+                if cursor then
+                    url = url .. "&cursor=" .. HttpService:UrlEncode(cursor)
+                end
+
                 local response = httpRequest({
                     Url = url,
-                    Method = method,
-                    Headers = body and {
-                        ["Content-Type"] = "application/json",
-                        ["Accept"] = "application/json"
-                    } or { ["Accept"] = "application/json" },
-                    Body = body and HttpService:JSONEncode(body) or nil
+                    Method = "GET",
+                    Headers = { ["Accept"] = "application/json" }
                 })
                 local status = response and tonumber(response.StatusCode)
                 if not response or not status or status < 200 or status >= 300 then
-                    error("Solicitud HTTP fallida: " .. tostring(status or "sin respuesta") .. " (" .. url .. ")")
+                    error("Roblox no permitio consultar la lista de servidores")
                 end
-                local decodedOk, decoded = pcall(function()
+
+                local decodedOk, data = pcall(function()
                     return HttpService:JSONDecode(response.Body)
                 end)
-                if not decodedOk or type(decoded) ~= "table" then
-                    error("Roblox devolvio una respuesta JSON invalida")
+                if not decodedOk or type(data) ~= "table" then
+                    error("Roblox devolvio una respuesta invalida")
                 end
-                return decoded
-            end
 
-            -- Resolver el username exacto a UserId.
-            local userData = sendRequest(
-                "https://users.roblox.com/v1/usernames/users",
-                "POST",
-                { usernames = { username }, excludeBannedUsers = true }
-            )
-            local userInfo = userData.data and userData.data[1]
-            if not userInfo or not userInfo.id then
-                error("Username no encontrado. Comprueba que este escrito correctamente")
-            end
-
-            -- Presence puede tardar en actualizarse; consultar hasta tres veces.
-            local presence
-            local lastPresenceError
-            for attempt = 1, 3 do
-                local presenceOk, presenceData = pcall(function()
-                    return sendRequest(
-                        "https://presence.roblox.com/v1/presence/users",
-                        "POST",
-                        { userIds = { userInfo.id } }
-                    )
-                end)
-                if presenceOk then
-                    presence = presenceData.userPresences and presenceData.userPresences[1]
-                    if type(presence) == "table" then
-                        local candidateJobId = presence.gameId or presence.GameId or presence.jobId or presence.JobId
-                        if candidateJobId ~= nil and tostring(candidateJobId) ~= "" and tostring(candidateJobId) ~= "0" then
-                            break
-                        end
-                    end
-                else
-                    lastPresenceError = presenceData
-                end
-                if attempt < 3 then task.wait(1) end
-            end
-
-            if type(presence) ~= "table" then
-                error("Roblox no devolvio datos de presencia" .. (lastPresenceError and (": " .. tostring(lastPresenceError)) or ""))
-            end
-
-            local presenceType = tonumber(presence.userPresenceType or presence.UserPresenceType)
-            if presenceType ~= 2 then
-                error("El jugador no aparece dentro de un servidor. Tipo de presencia: " .. tostring(presence.userPresenceType or presence.UserPresenceType or "desconocido"))
-            end
-
-            -- PlaceId identifica el modo/lugar actual; RootPlaceId identifica el inicio
-            -- de la experiencia. No se deben intercambiar si el jugador esta en un sub-Place.
-            local targetPlaceId = tonumber(presence.placeId or presence.placeID or presence.PlaceId)
-            local rootPlaceId = tonumber(presence.rootPlaceId or presence.rootPlaceID or presence.RootPlaceId)
-            local targetUniverseId = tonumber(presence.universeId or presence.universeID or presence.UniverseId)
-            local rawJobId = presence.gameId or presence.GameId or presence.jobId or presence.JobId
-            local targetJobId = rawJobId ~= nil and tostring(rawJobId) or nil
-            if targetJobId == "" or targetJobId == "0" then targetJobId = nil end
-
-            -- Resolver UniverseId desde el Place actual y, como respaldo, desde el RootPlace.
-            if not targetUniverseId then
-                local placesToCheck = {}
-                if targetPlaceId then table.insert(placesToCheck, targetPlaceId) end
-                if rootPlaceId and rootPlaceId ~= targetPlaceId then table.insert(placesToCheck, rootPlaceId) end
-                for _, placeIdToCheck in ipairs(placesToCheck) do
-                    local universeOk, universeData = pcall(function()
-                        return sendRequest(
-                            "https://apis.roblox.com/universes/v1/places/" .. tostring(placeIdToCheck) .. "/universe",
-                            "GET"
-                        )
-                    end)
-                    if universeOk then
-                        targetUniverseId = tonumber(universeData.universeId or universeData.UniverseId)
-                        if targetUniverseId then break end
+                for _, server in ipairs(data.data or {}) do
+                    local serverId = server.id and tostring(server.id)
+                    local playing = tonumber(server.playing) or 0
+                    local maxPlayers = tonumber(server.maxPlayers) or 0
+                    if serverId and serverId ~= currentJobId and not visitedServers[serverId]
+                        and maxPlayers > playing then
+                        table.insert(candidates, serverId)
                     end
                 end
+
+                cursor = data.nextPageCursor
+                if not cursor or #candidates >= 30 then break end
             end
-
-            -- Respaldo: si Presence omite PlaceId, RootPlaceId y UniverseId,
-            -- usar el Universe actual del cliente. Esto asume que el objetivo
-            -- tambien esta en esta misma experiencia, como indica JOIN PLAYER.
-            if not targetUniverseId then
-                local currentUniverseId = tonumber(game.GameId)
-                if currentUniverseId and currentUniverseId > 0 then
-                    targetUniverseId = currentUniverseId
-                end
-            end
-
-            if not targetUniverseId then
-                error("No se pudo determinar el UniverseId. Roblox omitio los identificadores de presencia y el juego actual no proporciono un GameId valido.")
-            end
-
-            if targetUniverseId ~= game.GameId then
-                error("El jugador esta en otra experiencia. Solo se permite unirse dentro de esta misma experiencia")
-            end
-
-            -- Si Roblox no proporciona gameId, no existe una forma publica de saber
-            -- que servidor contiene a ese usuario. Enumerar servidores no revela sus ocupantes.
-            if not targetJobId then
-                error("Roblox detecto al jugador, pero no proporciono el ID de su servidor. No se puede teletransportar sin ese dato.")
-            end
-
-            -- Si Presence omitio el PlaceId exacto, buscar en los Places del mismo Universe
-            -- la instancia publica cuyo ID coincida con el gameId recibido.
-            if not targetPlaceId then
-                local placesCursor = nil
-                for placesPage = 1, 10 do
-                    local placesUrl = "https://develop.roblox.com/v1/universes/" .. tostring(targetUniverseId) .. "/places?limit=100"
-                    if placesCursor then
-                        placesUrl = placesUrl .. "&cursor=" .. HttpService:UrlEncode(placesCursor)
-                    end
-
-                    local placesOk, placesData = pcall(function()
-                        return sendRequest(placesUrl, "GET")
-                    end)
-                    if not placesOk then break end
-
-                    for _, placeInfo in ipairs(placesData.data or {}) do
-                        local candidatePlaceId = tonumber(placeInfo.id or placeInfo.placeId or placeInfo.placeID)
-                        if candidatePlaceId then
-                            local serversCursor = nil
-                            for serversPage = 1, 8 do
-                                local serversUrl = "https://games.roblox.com/v1/games/" .. tostring(candidatePlaceId) .. "/servers/Public?limit=50&sortOrder=Asc"
-                                if serversCursor then
-                                    serversUrl = serversUrl .. "&cursor=" .. HttpService:UrlEncode(serversCursor)
-                                end
-
-                                local serversOk, serversData = pcall(function()
-                                    return sendRequest(serversUrl, "GET")
-                                end)
-                                if not serversOk then break end
-
-                                for _, serverInfo in ipairs(serversData.data or {}) do
-                                    if tostring(serverInfo.id) == targetJobId then
-                                        targetPlaceId = candidatePlaceId
-                                        break
-                                    end
-                                end
-                                if targetPlaceId then break end
-                                serversCursor = serversData.nextPageCursor
-                                if not serversCursor then break end
-                            end
-                        end
-                        if targetPlaceId then break end
-                    end
-
-                    if targetPlaceId then break end
-                    placesCursor = placesData.nextPageCursor
-                    if not placesCursor then break end
-                end
-            end
-
-            if not targetPlaceId then
-                error("Se obtuvo el ID del servidor, pero no se pudo determinar su PlaceId dentro de esta experiencia")
-            end
-
-            if targetJobId == game.JobId and targetPlaceId == game.PlaceId then
-                error("Ya estas en el mismo servidor que ese jugador")
-            end
-
-            return {
-                userName = userInfo.name,
-                placeId = targetPlaceId,
-                jobId = targetJobId
-            }
         end)
 
-        if not ok then
-            local cleanError = tostring(result)
-            cleanError = cleanError:gsub("^.-:%d+:%s*", "")
-            cleanError = cleanError:gsub("\r", " "):gsub("\n.*$", "")
-            JoinStatus.Text = cleanError
+        if not requestOk then
+            JoinStatus.Text = tostring(requestError):gsub("^.-:%d+:%s*", "")
             joinBusy = false
-            JoinButton.Text = "UNIRME"
+            JoinButton.Text = "CAMBIAR"
             JoinButton.BackgroundColor3 = PURPLE
             return
         end
 
-        JoinStatus.Text = "Conectando con " .. result.userName .. "..."
-        local teleportOk, teleportError = pcall(function()
-            game:GetService("TeleportService"):TeleportToPlaceInstance(
-                result.placeId,
-                result.jobId,
-                player
-            )
-        end)
-
-        if not teleportOk then
-            JoinStatus.Text = "No se pudo iniciar el teleport: " .. tostring(teleportError)
+        if #candidates == 0 then
+            JoinStatus.Text = "No hay otros servidores publicos disponibles"
             joinBusy = false
-            JoinButton.Text = "UNIRME"
+            JoinButton.Text = "CAMBIAR"
             JoinButton.BackgroundColor3 = PURPLE
+            return
         end
+
+        -- Probar varias instancias publicas; nunca se afirma que contengan a otro usuario.
+        for attempt = 1, math.min(5, #candidates) do
+            local index = math.random(1, #candidates)
+            local serverId = table.remove(candidates, index)
+            visitedServers[serverId] = true
+            JoinStatus.Text = "Intentando servidor " .. tostring(attempt) .. "/" .. tostring(math.min(5, #candidates + attempt)) .. "..."
+
+            local teleportOk, teleportError = pcall(function()
+                teleportService:TeleportToPlaceInstance(placeId, serverId, player)
+            end)
+
+            if teleportOk then
+                JoinStatus.Text = "Conectando a otro servidor publico..."
+                return
+            end
+
+            JoinStatus.Text = "Instancia no disponible; probando otra..."
+            task.wait(0.5)
+        end
+
+        JoinStatus.Text = "No se pudo entrar. Pulsa CAMBIAR para intentar de nuevo"
+        joinBusy = false
+        JoinButton.Text = "CAMBIAR"
+        JoinButton.BackgroundColor3 = PURPLE
     end)
 end
 
