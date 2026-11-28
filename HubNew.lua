@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.3"
+Version.Text = "v1.22"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -1402,44 +1402,104 @@ local function joinTargetPlayer()
                 error("El jugador no esta en un servidor de juego")
             end
 
-            -- La API de presencia no siempre incluye universeId.
-            -- Si falta, obtenerlo a partir del PlaceId con la API de Universes.
-            -- game.GameId es el UniverseId de la experiencia actual.
-            local targetPlaceId = tonumber(presence.placeId)
-                or tonumber(presence.rootPlaceId)
+            -- La API de presencia puede omitir PlaceId o usar variantes de mayusculas.
+            local targetPlaceId = tonumber(presence.placeId or presence.placeID or presence.PlaceId)
+            local rootPlaceId = tonumber(presence.rootPlaceId or presence.rootPlaceID or presence.RootPlaceId)
+            local targetUniverseId = tonumber(presence.universeId or presence.universeID or presence.UniverseId)
+            local targetJobId = presence.gameId or presence.GameId
 
-            if not targetPlaceId then
-                error("Roblox no devolvio el PlaceId ni el RootPlaceId del jugador")
+            if type(targetJobId) ~= "string" or targetJobId == "" then
+                error("Roblox no devolvio el identificador del servidor del jugador")
             end
 
-            local targetUniverseId = tonumber(presence.universeId)
-            if not targetUniverseId then
+            -- Si falta UniverseId, intentar obtenerlo usando el PlaceId o RootPlaceId.
+            local placeForUniverse = targetPlaceId or rootPlaceId
+            if not targetUniverseId and placeForUniverse then
                 local universeResponse = httpRequest({
-                    Url = "https://apis.roblox.com/universes/v1/places/" .. tostring(targetPlaceId) .. "/universe",
+                    Url = "https://apis.roblox.com/universes/v1/places/" .. tostring(placeForUniverse) .. "/universe",
                     Method = "GET",
                     Headers = { ["Accept"] = "application/json" }
                 })
 
                 local universeStatus = universeResponse and tonumber(universeResponse.StatusCode)
-                if not universeResponse or not universeStatus or universeStatus < 200 or universeStatus >= 300 then
-                    error("No se pudo obtener el UniverseId a partir del PlaceId")
+                if universeResponse and universeStatus and universeStatus >= 200 and universeStatus < 300 then
+                    local universeData = HttpService:JSONDecode(universeResponse.Body)
+                    targetUniverseId = tonumber(universeData and (universeData.universeId or universeData.UniverseId))
                 end
-
-                local universeData = HttpService:JSONDecode(universeResponse.Body)
-                targetUniverseId = tonumber(universeData and (universeData.universeId or universeData.UniverseId))
             end
 
             if not targetUniverseId then
-                error("La API de Roblox no devolvio el UniverseId de ese Place")
+                error("Roblox no devolvio el UniverseId; no se puede localizar el PlaceId de forma segura")
             end
 
             if targetUniverseId ~= game.GameId then
                 error("El jugador esta en otra experiencia; solo se permite este mismo juego")
             end
 
-            local targetJobId = presence.gameId
-            if type(targetJobId) ~= "string" or targetJobId == "" then
-                error("Roblox no devolvio el servidor del jugador")
+            -- Si Presence no dio el PlaceId exacto, buscar en los Places de la experiencia
+            -- el servidor cuyo identificador coincida con presence.gameId.
+            if not targetPlaceId then
+                local placesCursor = nil
+                for placesPage = 1, 10 do
+                    local placesUrl = "https://develop.roblox.com/v1/universes/" .. tostring(targetUniverseId) .. "/places?limit=100"
+                    if placesCursor then
+                        placesUrl = placesUrl .. "&cursor=" .. HttpService:UrlEncode(placesCursor)
+                    end
+
+                    local placesResponse = httpRequest({
+                        Url = placesUrl,
+                        Method = "GET",
+                        Headers = { ["Accept"] = "application/json" }
+                    })
+                    local placesStatus = placesResponse and tonumber(placesResponse.StatusCode)
+                    if not placesResponse or not placesStatus or placesStatus < 200 or placesStatus >= 300 then
+                        break
+                    end
+
+                    local placesData = HttpService:JSONDecode(placesResponse.Body)
+                    for _, placeInfo in ipairs(placesData.data or {}) do
+                        local candidatePlaceId = tonumber(placeInfo.id or placeInfo.placeId or placeInfo.placeID)
+                        if candidatePlaceId then
+                            local serversCursor = nil
+                            for serversPage = 1, 8 do
+                                local serversUrl = "https://games.roblox.com/v1/games/" .. tostring(candidatePlaceId) .. "/servers/Public?limit=50&sortOrder=Asc"
+                                if serversCursor then
+                                    serversUrl = serversUrl .. "&cursor=" .. HttpService:UrlEncode(serversCursor)
+                                end
+
+                                local serversResponse = httpRequest({
+                                    Url = serversUrl,
+                                    Method = "GET",
+                                    Headers = { ["Accept"] = "application/json" }
+                                })
+                                local serversStatus = serversResponse and tonumber(serversResponse.StatusCode)
+                                if not serversResponse or not serversStatus or serversStatus < 200 or serversStatus >= 300 then
+                                    break
+                                end
+
+                                local serversData = HttpService:JSONDecode(serversResponse.Body)
+                                for _, serverInfo in ipairs(serversData.data or {}) do
+                                    if tostring(serverInfo.id) == tostring(targetJobId) then
+                                        targetPlaceId = candidatePlaceId
+                                        break
+                                    end
+                                end
+                                if targetPlaceId then break end
+                                serversCursor = serversData.nextPageCursor
+                                if not serversCursor then break end
+                            end
+                        end
+                        if targetPlaceId then break end
+                    end
+
+                    if targetPlaceId then break end
+                    placesCursor = placesData.nextPageCursor
+                    if not placesCursor then break end
+                end
+            end
+
+            if not targetPlaceId then
+                error("Roblox omitio el PlaceId y no se pudo localizar el servidor; puede ser privado o no estar visible en la lista publica")
             end
 
             if targetJobId == game.JobId and targetPlaceId == game.PlaceId then
