@@ -1459,8 +1459,18 @@ local function joinTargetPlayer()
                 end
             end
 
+            -- Respaldo: si Presence omite PlaceId, RootPlaceId y UniverseId,
+            -- usar el Universe actual del cliente. Esto asume que el objetivo
+            -- tambien esta en esta misma experiencia, como indica JOIN PLAYER.
             if not targetUniverseId then
-                error("Roblox no devolvio el UniverseId. PlaceId=" .. tostring(targetPlaceId) .. ", RootPlaceId=" .. tostring(rootPlaceId))
+                local currentUniverseId = tonumber(game.GameId)
+                if currentUniverseId and currentUniverseId > 0 then
+                    targetUniverseId = currentUniverseId
+                end
+            end
+
+            if not targetUniverseId then
+                error("No se pudo determinar el UniverseId. Roblox omitio los identificadores de presencia y el juego actual no proporciono un GameId valido.")
             end
 
             if targetUniverseId ~= game.GameId then
