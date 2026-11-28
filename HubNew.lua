@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.3"
+Version.Text = "v1.3333"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -1250,7 +1250,7 @@ if saved.toggles.Utilities_AntiAFK == true then task.defer(toggleAntiAFK) end
 
 table.insert(controllers, stopAntiAFK)
 
--- UTILITIES: SERVER HOP (cambia a otro servidor publico de esta experiencia)
+-- UTILITIES: AUTO SERVER HOP (cambia automaticamente entre servidores publicos)
 local JoinOption = Instance.new("Frame")
 JoinOption.Name = "Utilities_JoinPlayer"
 JoinOption.Size = UDim2.new(1, -26, 0, 132)
@@ -1262,7 +1262,7 @@ table.insert(sections.Utilities, JoinOption)
 
 local JoinIndicator = Instance.new("Frame")
 JoinIndicator.Size = UDim2.new(0, 3, 1, 0)
-JoinIndicator.BackgroundColor3 = OFF
+JoinIndicator.BackgroundColor3 = PURPLE
 JoinIndicator.BorderSizePixel = 0
 JoinIndicator.Parent = JoinOption
 
@@ -1270,7 +1270,7 @@ local JoinLabel = Instance.new("TextLabel")
 JoinLabel.Size = UDim2.new(1, -24, 0, 22)
 JoinLabel.Position = UDim2.new(0, 12, 0, 7)
 JoinLabel.BackgroundTransparency = 1
-JoinLabel.Text = "SERVER HOP"
+JoinLabel.Text = "AUTO SERVER HOP"
 JoinLabel.TextColor3 = TEXT
 JoinLabel.Font = Enum.Font.GothamBold
 JoinLabel.TextSize = 13
@@ -1281,7 +1281,7 @@ local JoinNote = Instance.new("TextLabel")
 JoinNote.Size = UDim2.new(1, -24, 0, 30)
 JoinNote.Position = UDim2.new(0, 12, 0, 31)
 JoinNote.BackgroundTransparency = 1
-JoinNote.Text = "Cambiar a otro servidor publico de este juego"
+JoinNote.Text = "Busca y cambia automaticamente entre servidores publicos"
 JoinNote.TextColor3 = MUTED
 JoinNote.Font = Enum.Font.Code
 JoinNote.TextSize = 10
@@ -1292,9 +1292,9 @@ JoinNote.Parent = JoinOption
 local JoinButton = Instance.new("TextButton")
 JoinButton.Size = UDim2.new(0, 92, 0, 27)
 JoinButton.Position = UDim2.new(1, -104, 0, 87)
-JoinButton.BackgroundColor3 = PURPLE
+JoinButton.BackgroundColor3 = OFF
 JoinButton.BorderSizePixel = 0
-JoinButton.Text = "CAMBIAR"
+JoinButton.Text = "DETENER"
 JoinButton.TextColor3 = TEXT
 JoinButton.Font = Enum.Font.GothamBold
 JoinButton.TextSize = 11
@@ -1304,7 +1304,7 @@ local JoinStatus = Instance.new("TextLabel")
 JoinStatus.Size = UDim2.new(1, -112, 0, 42)
 JoinStatus.Position = UDim2.new(0, 12, 0, 82)
 JoinStatus.BackgroundTransparency = 1
-JoinStatus.Text = "Pulsa CAMBIAR para buscar otra instancia"
+JoinStatus.Text = "Iniciando busqueda automatica..."
 JoinStatus.TextColor3 = MUTED
 JoinStatus.Font = Enum.Font.Code
 JoinStatus.TextSize = 9
@@ -1314,7 +1314,9 @@ JoinStatus.TextYAlignment = Enum.TextYAlignment.Center
 JoinStatus.Parent = JoinOption
 
 local joinBusy = false
+local autoHopEnabled = true
 local visitedServers = {}
+local retryDelay = 4
 
 local function getExecutorRequest()
     if type(request) == "function" then return request end
@@ -1323,19 +1325,34 @@ local function getExecutorRequest()
     return nil
 end
 
-local function joinTargetPlayer()
-    if joinBusy or not running then return end
+local joinTargetPlayer
+local function scheduleAutoRetry(message)
+    joinBusy = false
+    if not autoHopEnabled or not running then return end
+    JoinStatus.Text = message .. " Reintentando automaticamente..."
+    JoinButton.Text = "DETENER"
+    JoinButton.BackgroundColor3 = OFF
+    task.delay(retryDelay, function()
+        if autoHopEnabled and running and not joinBusy then
+            joinTargetPlayer()
+        end
+    end)
+end
+
+joinTargetPlayer = function()
+    if joinBusy or not autoHopEnabled or not running then return end
 
     local httpRequest = getExecutorRequest()
     if not httpRequest then
-        JoinStatus.Text = "Tu ejecutor no admite solicitudes HTTP"
+        scheduleAutoRetry("Tu ejecutor no admite solicitudes HTTP.")
         return
     end
 
     joinBusy = true
-    JoinButton.Text = "BUSCANDO"
+    JoinButton.Text = "DETENER"
     JoinButton.BackgroundColor3 = OFF
-    JoinStatus.Text = "Buscando servidores publicos..."
+    JoinIndicator.BackgroundColor3 = PURPLE
+    JoinStatus.Text = "Buscando servidores publicos automaticamente..."
 
     task.spawn(function()
         local teleportService = game:GetService("TeleportService")
@@ -1345,6 +1362,7 @@ local function joinTargetPlayer()
         local cursor = nil
         local requestOk, requestError = pcall(function()
             for page = 1, 4 do
+                if not autoHopEnabled or not running then return end
                 local url = "https://games.roblox.com/v1/games/" .. tostring(placeId) .. "/servers/Public?limit=100&sortOrder=Asc"
                 if cursor then
                     url = url .. "&cursor=" .. HttpService:UrlEncode(cursor)
@@ -1382,50 +1400,79 @@ local function joinTargetPlayer()
             end
         end)
 
-        if not requestOk then
-            JoinStatus.Text = tostring(requestError):gsub("^.-:%d+:%s*", "")
+        if not autoHopEnabled or not running then
             joinBusy = false
-            JoinButton.Text = "CAMBIAR"
-            JoinButton.BackgroundColor3 = PURPLE
+            JoinStatus.Text = "Cambio automatico detenido"
+            return
+        end
+
+        if not requestOk then
+            scheduleAutoRetry(tostring(requestError):gsub("^.-:%d+:%s*", "Error al consultar servidores:"))
             return
         end
 
         if #candidates == 0 then
-            JoinStatus.Text = "No hay otros servidores publicos disponibles"
-            joinBusy = false
-            JoinButton.Text = "CAMBIAR"
-            JoinButton.BackgroundColor3 = PURPLE
+            visitedServers = {}
+            scheduleAutoRetry("No se encontraron instancias nuevas disponibles.")
             return
         end
 
-        -- Probar varias instancias publicas; nunca se afirma que contengan a otro usuario.
-        for attempt = 1, math.min(5, #candidates) do
+        local totalAttempts = math.min(5, #candidates)
+        for attempt = 1, totalAttempts do
+            if not autoHopEnabled or not running then
+                joinBusy = false
+                JoinStatus.Text = "Cambio automatico detenido"
+                return
+            end
+
             local index = math.random(1, #candidates)
             local serverId = table.remove(candidates, index)
             visitedServers[serverId] = true
-            JoinStatus.Text = "Intentando servidor " .. tostring(attempt) .. "/" .. tostring(math.min(5, #candidates + attempt)) .. "..."
+            JoinStatus.Text = "Intentando servidor publico " .. tostring(attempt) .. "/" .. tostring(totalAttempts) .. "..."
 
-            local teleportOk, teleportError = pcall(function()
+            local teleportOk = pcall(function()
                 teleportService:TeleportToPlaceInstance(placeId, serverId, player)
             end)
 
             if teleportOk then
-                JoinStatus.Text = "Conectando a otro servidor publico..."
+                JoinStatus.Text = "Conectando... Si no cambia, se reintentara al recibir el error de Roblox."
                 return
             end
-
-            JoinStatus.Text = "Instancia no disponible; probando otra..."
             task.wait(0.5)
         end
 
-        JoinStatus.Text = "No se pudo entrar. Pulsa CAMBIAR para intentar de nuevo"
-        joinBusy = false
-        JoinButton.Text = "CAMBIAR"
-        JoinButton.BackgroundColor3 = PURPLE
+        scheduleAutoRetry("No se pudo entrar a las instancias encontradas.")
     end)
 end
 
-JoinButton.MouseButton1Click:Connect(joinTargetPlayer)
+-- Roblox puede rechazar el teletransporte despues de que la llamada inicial haya sido aceptada.
+game:GetService("TeleportService").TeleportInitFailed:Connect(function(failedPlayer, teleportResult, errorMessage)
+    if failedPlayer ~= player or not autoHopEnabled or not running then return end
+    scheduleAutoRetry("Fallo el teletransporte: " .. tostring(errorMessage or teleportResult))
+end)
+
+JoinButton.MouseButton1Click:Connect(function()
+    autoHopEnabled = not autoHopEnabled
+    if autoHopEnabled then
+        JoinButton.Text = "DETENER"
+        JoinButton.BackgroundColor3 = OFF
+        JoinIndicator.BackgroundColor3 = PURPLE
+        JoinStatus.Text = "Cambio automatico activado..."
+        joinTargetPlayer()
+    else
+        JoinButton.Text = "INICIAR"
+        JoinButton.BackgroundColor3 = PURPLE
+        JoinIndicator.BackgroundColor3 = OFF
+        JoinStatus.Text = "Cambio automatico detenido"
+    end
+end)
+
+-- Inicio automatico al cargar el HUB.
+task.defer(function()
+    if running and autoHopEnabled then
+        joinTargetPlayer()
+    end
+end)
 
 showSection(saved.lastTab)
 
