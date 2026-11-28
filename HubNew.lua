@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.4"
+Version.Text = "v1.3"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -1400,18 +1400,27 @@ local function joinTargetPlayer()
 
             local presenceData = HttpService:JSONDecode(presenceResponse.Body)
             local presence = presenceData.userPresences and presenceData.userPresences[1]
-            if not presence or presence.userPresenceType ~= 4 then
-                error("El jugador no esta en un servidor de juego")
+            if type(presence) ~= "table" then
+                error("Roblox no devolvio datos de presencia para ese usuario")
+            end
+
+            -- Roblox puede representar este campo como numero o como texto.
+            local presenceType = tonumber(presence.userPresenceType or presence.UserPresenceType)
+            if presenceType ~= 2 then
+                error("El jugador no aparece en un servidor de juego (tipo de presencia: " .. tostring(presence.userPresenceType or presence.UserPresenceType or "desconocido") .. ")")
             end
 
             -- La API de presencia puede omitir PlaceId o usar variantes de mayusculas.
             local targetPlaceId = tonumber(presence.placeId or presence.placeID or presence.PlaceId)
             local rootPlaceId = tonumber(presence.rootPlaceId or presence.rootPlaceID or presence.RootPlaceId)
             local targetUniverseId = tonumber(presence.universeId or presence.universeID or presence.UniverseId)
-            local targetJobId = presence.gameId or presence.GameId
+            local targetJobId = presence.gameId or presence.GameId or presence.jobId or presence.JobId
 
+            if targetJobId ~= nil then
+                targetJobId = tostring(targetJobId)
+            end
             if type(targetJobId) ~= "string" or targetJobId == "" then
-                error("Roblox no devolvio el identificador del servidor del jugador")
+                error("Roblox confirma que esta jugando, pero no comparte el identificador de su servidor. La visibilidad de union no garantiza que Presence entregue ese dato.")
             end
 
             -- Si falta UniverseId, intentar obtenerlo usando el PlaceId o RootPlaceId.
@@ -1501,43 +1510,7 @@ local function joinTargetPlayer()
             end
 
             if not targetPlaceId then
-                error("Roblox no compartio el PlaceId y no se pudo localizar el servidor en la lista publica")
-            end
-
-            -- Confirmar que el identificador corresponde a un servidor publico.
-            -- No se intenta entrar a servidores privados ni a instancias ocultas.
-            local publicServerFound = false
-            local publicCursor = nil
-            for publicPage = 1, 10 do
-                local publicUrl = "https://games.roblox.com/v1/games/" .. tostring(targetPlaceId) .. "/servers/Public?limit=100&sortOrder=Asc"
-                if publicCursor then
-                    publicUrl = publicUrl .. "&cursor=" .. HttpService:UrlEncode(publicCursor)
-                end
-
-                local publicResponse = httpRequest({
-                    Url = publicUrl,
-                    Method = "GET",
-                    Headers = { ["Accept"] = "application/json" }
-                })
-                local publicStatus = publicResponse and tonumber(publicResponse.StatusCode)
-                if not publicResponse or not publicStatus or publicStatus < 200 or publicStatus >= 300 then
-                    break
-                end
-
-                local publicData = HttpService:JSONDecode(publicResponse.Body)
-                for _, serverInfo in ipairs(publicData.data or {}) do
-                    if tostring(serverInfo.id) == tostring(targetJobId) then
-                        publicServerFound = true
-                        break
-                    end
-                end
-                if publicServerFound then break end
-                publicCursor = publicData.nextPageCursor
-                if not publicCursor then break end
-            end
-
-            if not publicServerFound then
-                error("El servidor no aparece en la lista publica de Roblox o no esta disponible para unirse")
+                error("Roblox omitio el PlaceId y no se pudo localizar el servidor; puede ser privado o no estar visible en la lista publica")
             end
 
             if targetJobId == game.JobId and targetPlaceId == game.PlaceId then
