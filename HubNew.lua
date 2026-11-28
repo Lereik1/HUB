@@ -1250,7 +1250,7 @@ if saved.toggles.Utilities_AntiAFK == true then task.defer(toggleAntiAFK) end
 
 table.insert(controllers, stopAntiAFK)
 
--- UTILITIES: JOIN PLAYER (solo dentro del mismo juego/PlaceId)
+-- UTILITIES: JOIN PLAYER (permite otros Places dentro de la misma experiencia/Universe)
 -- Busca el servidor actual del usuario mediante la API de presencia de Roblox.
 local JoinOption = Instance.new("Frame")
 JoinOption.Name = "Utilities_JoinPlayer"
@@ -1402,9 +1402,21 @@ local function joinTargetPlayer()
                 error("El jugador no esta en un servidor de juego")
             end
 
-            -- Bloqueo estricto: nunca intentar unirse si el PlaceId es distinto.
-            if tonumber(presence.placeId) ~= game.PlaceId then
-                error("El jugador esta en otro juego; solo se permite este mismo juego")
+            -- Permitir cualquier Place que pertenezca a la misma experiencia.
+            -- game.GameId es el UniverseId de la experiencia actual.
+            local targetUniverseId = tonumber(presence.universeId)
+            local targetPlaceId = tonumber(presence.placeId)
+
+            if not targetUniverseId then
+                error("Roblox no devolvio el UniverseId del jugador; no se puede verificar que sea la misma experiencia")
+            end
+
+            if targetUniverseId ~= game.GameId then
+                error("El jugador esta en otra experiencia; solo se permite este mismo juego")
+            end
+
+            if not targetPlaceId then
+                error("Roblox no devolvio el PlaceId del servidor del jugador")
             end
 
             local targetJobId = presence.gameId
@@ -1412,12 +1424,13 @@ local function joinTargetPlayer()
                 error("Roblox no devolvio el servidor del jugador")
             end
 
-            if targetJobId == game.JobId then
+            if targetJobId == game.JobId and targetPlaceId == game.PlaceId then
                 error("Ya estas en el mismo servidor que ese jugador")
             end
 
             return {
                 userName = userInfo.name,
+                placeId = targetPlaceId,
                 jobId = targetJobId
             }
         end)
@@ -1433,7 +1446,7 @@ local function joinTargetPlayer()
         JoinStatus.Text = "Conectando con " .. result.userName .. "..."
         local teleportOk, teleportError = pcall(function()
             game:GetService("TeleportService"):TeleportToPlaceInstance(
-                game.PlaceId,
+                result.placeId,
                 result.jobId,
                 player
             )
