@@ -1363,92 +1363,122 @@ local function joinTargetPlayer()
 
     task.spawn(function()
         local ok, result = pcall(function()
-            -- Resolver el username a UserId.
-            local userResponse = httpRequest({
-                Url = "https://users.roblox.com/v1/usernames/users",
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = HttpService:JSONEncode({
-                    usernames = { username },
-                    excludeBannedUsers = true
+            local function sendRequest(url, method, body)
+                local response = httpRequest({
+                    Url = url,
+                    Method = method,
+                    Headers = body and {
+                        ["Content-Type"] = "application/json",
+                        ["Accept"] = "application/json"
+                    } or { ["Accept"] = "application/json" },
+                    Body = body and HttpService:JSONEncode(body) or nil
                 })
-            })
-
-            local userStatus = userResponse and tonumber(userResponse.StatusCode)
-            if not userResponse or not userStatus or userStatus < 200 or userStatus >= 300 then
-                error("No se pudo encontrar el usuario (respuesta HTTP invalida)")
+                local status = response and tonumber(response.StatusCode)
+                if not response or not status or status < 200 or status >= 300 then
+                    error("Solicitud HTTP fallida: " .. tostring(status or "sin respuesta") .. " (" .. url .. ")")
+                end
+                local decodedOk, decoded = pcall(function()
+                    return HttpService:JSONDecode(response.Body)
+                end)
+                if not decodedOk or type(decoded) ~= "table" then
+                    error("Roblox devolvio una respuesta JSON invalida")
+                end
+                return decoded
             end
 
-            local userData = HttpService:JSONDecode(userResponse.Body)
+            -- Resolver el username exacto a UserId.
+            local userData = sendRequest(
+                "https://users.roblox.com/v1/usernames/users",
+                "POST",
+                { usernames = { username }, excludeBannedUsers = true }
+            )
             local userInfo = userData.data and userData.data[1]
             if not userInfo or not userInfo.id then
-                error("Username no encontrado")
+                error("Username no encontrado. Comprueba que este escrito correctamente")
             end
 
-            -- Consultar presencia para obtener el JobId del servidor.
-            local presenceResponse = httpRequest({
-                Url = "https://presence.roblox.com/v1/presence/users",
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = HttpService:JSONEncode({ userIds = { userInfo.id } })
-            })
-
-            local presenceStatus = presenceResponse and tonumber(presenceResponse.StatusCode)
-            if not presenceResponse or not presenceStatus or presenceStatus < 200 or presenceStatus >= 300 then
-                error("No se pudo consultar su presencia (respuesta HTTP invalida)")
+            -- Presence puede tardar en actualizarse; consultar hasta tres veces.
+            local presence
+            local lastPresenceError
+            for attempt = 1, 3 do
+                local presenceOk, presenceData = pcall(function()
+                    return sendRequest(
+                        "https://presence.roblox.com/v1/presence/users",
+                        "POST",
+                        { userIds = { userInfo.id } }
+                    )
+                end)
+                if presenceOk then
+                    presence = presenceData.userPresences and presenceData.userPresences[1]
+                    if type(presence) == "table" then
+                        local candidateJobId = presence.gameId or presence.GameId or presence.jobId or presence.JobId
+                        if candidateJobId ~= nil and tostring(candidateJobId) ~= "" and tostring(candidateJobId) ~= "0" then
+                            break
+                        end
+                    end
+                else
+                    lastPresenceError = presenceData
+                end
+                if attempt < 3 then task.wait(1) end
             end
 
-            local presenceData = HttpService:JSONDecode(presenceResponse.Body)
-            local presence = presenceData.userPresences and presenceData.userPresences[1]
             if type(presence) ~= "table" then
-                error("Roblox no devolvio datos de presencia para ese usuario")
+                error("Roblox no devolvio datos de presencia" .. (lastPresenceError and (": " .. tostring(lastPresenceError)) or ""))
             end
 
-            -- Roblox puede representar este campo como numero o como texto.
             local presenceType = tonumber(presence.userPresenceType or presence.UserPresenceType)
             if presenceType ~= 2 then
-                error("El jugador no aparece en un servidor de juego (tipo de presencia: " .. tostring(presence.userPresenceType or presence.UserPresenceType or "desconocido") .. ")")
+                error("El jugador no aparece dentro de un servidor. Tipo de presencia: " .. tostring(presence.userPresenceType or presence.UserPresenceType or "desconocido"))
             end
 
-            -- La API de presencia puede omitir PlaceId o usar variantes de mayusculas.
+            -- PlaceId identifica el modo/lugar actual; RootPlaceId identifica el inicio
+            -- de la experiencia. No se deben intercambiar si el jugador esta en un sub-Place.
             local targetPlaceId = tonumber(presence.placeId or presence.placeID or presence.PlaceId)
             local rootPlaceId = tonumber(presence.rootPlaceId or presence.rootPlaceID or presence.RootPlaceId)
             local targetUniverseId = tonumber(presence.universeId or presence.universeID or presence.UniverseId)
-            local targetJobId = presence.gameId or presence.GameId or presence.jobId or presence.JobId
+            local rawJobId = presence.gameId or presence.GameId or presence.jobId or presence.JobId
+            local targetJobId = rawJobId ~= nil and tostring(rawJobId) or nil
+            if targetJobId == "" or targetJobId == "0" then targetJobId = nil end
 
-            if targetJobId ~= nil then
-                targetJobId = tostring(targetJobId)
-            end
-            if type(targetJobId) ~= "string" or targetJobId == "" then
-                error("Roblox confirma que esta jugando, pero no comparte el identificador de su servidor. La visibilidad de union no garantiza que Presence entregue ese dato.")
-            end
-
-            -- Si falta UniverseId, intentar obtenerlo usando el PlaceId o RootPlaceId.
-            local placeForUniverse = targetPlaceId or rootPlaceId
-            if not targetUniverseId and placeForUniverse then
-                local universeResponse = httpRequest({
-                    Url = "https://apis.roblox.com/universes/v1/places/" .. tostring(placeForUniverse) .. "/universe",
-                    Method = "GET",
-                    Headers = { ["Accept"] = "application/json" }
-                })
-
-                local universeStatus = universeResponse and tonumber(universeResponse.StatusCode)
-                if universeResponse and universeStatus and universeStatus >= 200 and universeStatus < 300 then
-                    local universeData = HttpService:JSONDecode(universeResponse.Body)
-                    targetUniverseId = tonumber(universeData and (universeData.universeId or universeData.UniverseId))
+            -- Resolver UniverseId desde el Place actual y, como respaldo, desde el RootPlace.
+            if not targetUniverseId then
+                local placesToCheck = {}
+                if targetPlaceId then table.insert(placesToCheck, targetPlaceId) end
+                if rootPlaceId and rootPlaceId ~= targetPlaceId then table.insert(placesToCheck, rootPlaceId) end
+                for _, placeIdToCheck in ipairs(placesToCheck) do
+                    local universeOk, universeData = pcall(function()
+                        return sendRequest(
+                            "https://apis.roblox.com/universes/v1/places/" .. tostring(placeIdToCheck) .. "/universe",
+                            "GET"
+                        )
+                    end)
+                    if universeOk then
+                        targetUniverseId = tonumber(universeData.universeId or universeData.UniverseId)
+                        if targetUniverseId then break end
+                    end
                 end
             end
 
             if not targetUniverseId then
-                error("Roblox no devolvio el UniverseId; no se puede localizar el PlaceId de forma segura")
+                error("Roblox no devolvio el UniverseId. PlaceId=" .. tostring(targetPlaceId) .. ", RootPlaceId=" .. tostring(rootPlaceId))
             end
 
             if targetUniverseId ~= game.GameId then
-                error("El jugador esta en otra experiencia; solo se permite este mismo juego")
+                error("El jugador esta en otra experiencia. Solo se permite unirse dentro de esta misma experiencia")
             end
 
-            -- Si Presence no dio el PlaceId exacto, buscar en los Places de la experiencia
-            -- el servidor cuyo identificador coincida con presence.gameId.
+            -- Si Roblox no proporciona gameId, no existe una forma publica de saber
+            -- que servidor contiene a ese usuario. Enumerar servidores no revela sus ocupantes.
+            if not targetJobId then
+                error(
+                    "Roblox confirma que " .. tostring(userInfo.name) .. " esta jugando, pero no entrego el ID de su servidor (gameId). " ..
+                    "PlaceId=" .. tostring(targetPlaceId) .. ", RootPlaceId=" .. tostring(rootPlaceId) ..
+                    ", UniverseId=" .. tostring(targetUniverseId) .. ". No se puede identificar su instancia publica sin ese dato."
+                )
+            end
+
+            -- Si Presence omitio el PlaceId exacto, buscar en los Places del mismo Universe
+            -- la instancia publica cuyo ID coincida con el gameId recibido.
             if not targetPlaceId then
                 local placesCursor = nil
                 for placesPage = 1, 10 do
@@ -1457,17 +1487,11 @@ local function joinTargetPlayer()
                         placesUrl = placesUrl .. "&cursor=" .. HttpService:UrlEncode(placesCursor)
                     end
 
-                    local placesResponse = httpRequest({
-                        Url = placesUrl,
-                        Method = "GET",
-                        Headers = { ["Accept"] = "application/json" }
-                    })
-                    local placesStatus = placesResponse and tonumber(placesResponse.StatusCode)
-                    if not placesResponse or not placesStatus or placesStatus < 200 or placesStatus >= 300 then
-                        break
-                    end
+                    local placesOk, placesData = pcall(function()
+                        return sendRequest(placesUrl, "GET")
+                    end)
+                    if not placesOk then break end
 
-                    local placesData = HttpService:JSONDecode(placesResponse.Body)
                     for _, placeInfo in ipairs(placesData.data or {}) do
                         local candidatePlaceId = tonumber(placeInfo.id or placeInfo.placeId or placeInfo.placeID)
                         if candidatePlaceId then
@@ -1478,19 +1502,13 @@ local function joinTargetPlayer()
                                     serversUrl = serversUrl .. "&cursor=" .. HttpService:UrlEncode(serversCursor)
                                 end
 
-                                local serversResponse = httpRequest({
-                                    Url = serversUrl,
-                                    Method = "GET",
-                                    Headers = { ["Accept"] = "application/json" }
-                                })
-                                local serversStatus = serversResponse and tonumber(serversResponse.StatusCode)
-                                if not serversResponse or not serversStatus or serversStatus < 200 or serversStatus >= 300 then
-                                    break
-                                end
+                                local serversOk, serversData = pcall(function()
+                                    return sendRequest(serversUrl, "GET")
+                                end)
+                                if not serversOk then break end
 
-                                local serversData = HttpService:JSONDecode(serversResponse.Body)
                                 for _, serverInfo in ipairs(serversData.data or {}) do
-                                    if tostring(serverInfo.id) == tostring(targetJobId) then
+                                    if tostring(serverInfo.id) == targetJobId then
                                         targetPlaceId = candidatePlaceId
                                         break
                                     end
@@ -1510,7 +1528,7 @@ local function joinTargetPlayer()
             end
 
             if not targetPlaceId then
-                error("Roblox omitio el PlaceId y no se pudo localizar el servidor; puede ser privado o no estar visible en la lista publica")
+                error("Se obtuvo el ID del servidor, pero no se pudo determinar su PlaceId dentro de esta experiencia")
             end
 
             if targetJobId == game.JobId and targetPlaceId == game.PlaceId then
