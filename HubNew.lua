@@ -1374,8 +1374,9 @@ local function joinTargetPlayer()
                 })
             })
 
-            if not userResponse or userResponse.StatusCode < 200 or userResponse.StatusCode >= 300 then
-                error("No se pudo encontrar el usuario")
+            local userStatus = userResponse and tonumber(userResponse.StatusCode)
+            if not userResponse or not userStatus or userStatus < 200 or userStatus >= 300 then
+                error("No se pudo encontrar el usuario (respuesta HTTP invalida)")
             end
 
             local userData = HttpService:JSONDecode(userResponse.Body)
@@ -1392,8 +1393,9 @@ local function joinTargetPlayer()
                 Body = HttpService:JSONEncode({ userIds = { userInfo.id } })
             })
 
-            if not presenceResponse or presenceResponse.StatusCode < 200 or presenceResponse.StatusCode >= 300 then
-                error("No se pudo consultar su presencia")
+            local presenceStatus = presenceResponse and tonumber(presenceResponse.StatusCode)
+            if not presenceResponse or not presenceStatus or presenceStatus < 200 or presenceStatus >= 300 then
+                error("No se pudo consultar su presencia (respuesta HTTP invalida)")
             end
 
             local presenceData = HttpService:JSONDecode(presenceResponse.Body)
@@ -1499,7 +1501,43 @@ local function joinTargetPlayer()
             end
 
             if not targetPlaceId then
-                error("Roblox omitio el PlaceId y no se pudo localizar el servidor; puede ser privado o no estar visible en la lista publica")
+                error("Roblox no compartio el PlaceId y no se pudo localizar el servidor en la lista publica")
+            end
+
+            -- Confirmar que el identificador corresponde a un servidor publico.
+            -- No se intenta entrar a servidores privados ni a instancias ocultas.
+            local publicServerFound = false
+            local publicCursor = nil
+            for publicPage = 1, 10 do
+                local publicUrl = "https://games.roblox.com/v1/games/" .. tostring(targetPlaceId) .. "/servers/Public?limit=100&sortOrder=Asc"
+                if publicCursor then
+                    publicUrl = publicUrl .. "&cursor=" .. HttpService:UrlEncode(publicCursor)
+                end
+
+                local publicResponse = httpRequest({
+                    Url = publicUrl,
+                    Method = "GET",
+                    Headers = { ["Accept"] = "application/json" }
+                })
+                local publicStatus = publicResponse and tonumber(publicResponse.StatusCode)
+                if not publicResponse or not publicStatus or publicStatus < 200 or publicStatus >= 300 then
+                    break
+                end
+
+                local publicData = HttpService:JSONDecode(publicResponse.Body)
+                for _, serverInfo in ipairs(publicData.data or {}) do
+                    if tostring(serverInfo.id) == tostring(targetJobId) then
+                        publicServerFound = true
+                        break
+                    end
+                end
+                if publicServerFound then break end
+                publicCursor = publicData.nextPageCursor
+                if not publicCursor then break end
+            end
+
+            if not publicServerFound then
+                error("El servidor no aparece en la lista publica de Roblox o no esta disponible para unirse")
             end
 
             if targetJobId == game.JobId and targetPlaceId == game.PlaceId then
