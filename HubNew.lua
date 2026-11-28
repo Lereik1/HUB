@@ -167,7 +167,7 @@ local Version = Instance.new("TextLabel")
 Version.Size = UDim2.new(0, 40, 0, 15)
 Version.Position = UDim2.new(0, 150, 0, 19)
 Version.BackgroundTransparency = 1
-Version.Text = "v1.22"
+Version.Text = "v1.4"
 Version.TextColor3 = PURPLE
 Version.Font = Enum.Font.GothamBold
 Version.TextSize = 10
@@ -1400,7 +1400,7 @@ local function joinTargetPlayer()
 
             local presenceData = HttpService:JSONDecode(presenceResponse.Body)
             local presence = presenceData.userPresences and presenceData.userPresences[1]
-            if not presence or presence.userPresenceType ~= 2 then
+            if not presence or presence.userPresenceType ~= 4 then
                 error("El jugador no esta en un servidor de juego")
             end
 
